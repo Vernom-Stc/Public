@@ -179,3 +179,15 @@ input[type=text],select{
 .selbar{flex-wrap:nowrap}
 .selbar #selCancel{flex:0 0 auto;min-width:44px}
 .selbar .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Cerbère */
+.cerbere{max-height:60vh;max-height:60dvh}
+.cerbere p{margin:0}
+.cerbere-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cerbere-item{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}
+.cerbere-voir{flex:1;min-width:0;display:grid;gap:2px;text-align:left;background:none;border:0;color:var(--ink);font:inherit;cursor:pointer;padding:2px}
+.cerbere-voir strong{font-size:.88rem}
+.cerbere-voir span{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.cerbere-act{display:flex;gap:6px;flex:none}
+.cerbere-foot{display:flex;gap:8px}
+.cerbere-foot .btn{flex:1}

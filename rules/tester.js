@@ -63,8 +63,10 @@ function tester(nom, regles) {
 }
 
 const paysFichiers = fs.readdirSync(path.join(racine, "rules/pays")).filter((f) => f.endsWith(".js") && !f.startsWith("_")).map((f) => "rules/pays/" + f);
-const K = charger(["rules/commun.js", ...paysFichiers]);
+const K = charger(["rules/commun.js", "rules/cerbere.js", ...paysFichiers]);
 tester("Commun", K.commun);
+tester("Cerbère", K.cerbere.regles);
+if (!K.cerbere.sensibles.length) ko("Cerbère : la liste des mots sensibles est vide");
 for (const code of Object.keys(K.pays)) tester(`${K.pays[code].nom} (${code})`, K.pays[code].regles);
 
 // Le modèle doit rester valide, puisqu'on le copie.
@@ -74,7 +76,7 @@ for (const code of Object.keys(modele.pays)) tester("Modèle (_modele.js)", mode
 // Chaque pays doit être chargé par l'application et gardé pour le mode avion.
 console.log("Déclarations");
 const html = lire("index.html"), sw = lire("sw.js");
-for (const f of ["rules/registre.js", "rules/commun.js", ...paysFichiers]) {
+for (const f of ["rules/registre.js", "rules/commun.js", "rules/cerbere.js", ...paysFichiers]) {
   if (!html.includes(`src="${f}"`)) ko(`${f} manque dans index.html`);
   if (!sw.includes(`"${f}"`)) ko(`${f} manque dans sw.js (liste FILES)`);
 }

@@ -227,7 +227,7 @@
   function closeSheet() { $("sheet").hidden = true; $("backdrop").hidden = true; }
   $("btnOpts").addEventListener("click", openSheet);
   $("closeSheet").addEventListener("click", closeSheet);
-  $("backdrop").addEventListener("click", closeSheet);
+  $("backdrop").addEventListener("click", () => { closeSheet(); if (!$("cerbere").hidden) fermerCerbere(); });
   $("inCam").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
   $("inFile").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
 
@@ -302,6 +302,12 @@
   function render() {
     const p = page(); if (!p) return;
     paint(ctx, p, true, false);
+    // Point signalé par Cerbère : encadré en orange.
+    if (S.flash && S.flash.page === p) {
+      ctx.save(); ctx.lineWidth = Math.max(4, cv.width / 300); ctx.strokeStyle = "#ff7a00"; ctx.fillStyle = "rgba(255,122,0,.18)";
+      S.flash.rects.forEach((r) => { ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x, r.y, r.w, r.h); });
+      ctx.restore();
+    }
     // Zone sélectionnée au rectangle : en surbrillance, en attente d'un choix.
     if (S.sel && S.sel.page === p) {
       const r = S.sel.rect;
@@ -579,7 +585,7 @@
     if (p.lines) return;
     const w = await getWorker();
     const { data } = await w.recognize(p.img);
-    p.lines = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: x.bbox })) }));
+    p.lines = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: x.bbox, conf: x.confidence })) }));
   }
 
   const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -835,7 +841,7 @@
     try { save(await prepared()); } catch (e) { setStatus("L'export a échoué. Réessayez."); }
   });
 
-  $("btnShare").addEventListener("click", async () => {
+  async function doShare() {
     let out;
     try { out = await prepared(); } catch (e) { setStatus("L'export a échoué. Réessayez."); return; }
     const data = fmt() === "text" ? { text: out.text } : { files: out.files };
@@ -851,9 +857,10 @@
       if (e.name === "AbortError") setStatus("");
       else setStatus("C'est prêt. Touchez encore « Partager ».");
     }
-  });
+  }
+  $("btnShare").addEventListener("click", () => avecCerbere(doShare));
 
-  $("btnCopy").addEventListener("click", async () => {
+  async function doCopy() {
     try {
       if (fmt() === "text") {
         const out = await prepared();
@@ -877,7 +884,161 @@
     } catch (e) {
       setStatus("La copie n'est pas autorisée ici. Utilisez « Partager » ou « Enregistrer ».");
     }
+  }
+  $("btnCopy").addEventListener("click", () => avecCerbere(doCopy));
+
+  /* --------------------------- Cerbère : vérifier ce qui reste visible, avant d'envoyer */
+  // Tout se passe ici, sur l'appareil. Les règles et la liste des mots sensibles sont dans rules/cerbere.js.
+  let cerbereOk = -1;        // version du document déjà vérifiée par Cerbère
+  let cerbereSuite = null;   // action à faire après le rapport : doShare ou doCopy
+  let cerbereItems = [];
+
+  function couvert(p) {
+    const trait = strokeMask(p);
+    return (x, y) => trait(x, y) || p.boxes.some((b) => b.active && (b.rects || [b]).some((r) =>
+      x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h));
+  }
+
+  // Applique une liste de règles aux mots visibles d'une ligne, et renvoie les zones trouvées.
+  function chercher(regles, mots) {
+    if (!mots.length) return [];
+    let raw = ""; const rr = [];
+    mots.forEach((w, i) => { if (i) raw += " "; rr.push([raw.length, raw.length + w.text.length]); raw += w.text; });
+    const out = [];
+    for (const r of regles) {
+      r.re.lastIndex = 0; let m;
+      while ((m = r.re.exec(raw))) {
+        if (!m[0].trim()) { r.re.lastIndex++; continue; }
+        const v = m[0].trim();
+        if (r.check && !r.check(v) && r.silent) continue;
+        const s = m.index, e = m.index + m[0].length;
+        const touches = mots.filter((w, i) => rr[i][0] < e && rr[i][1] > s);
+        out.push({ regle: r, texte: v, mots: touches });
+      }
+    }
+    return out;
+  }
+
+  const rectsDe = (mots) => mots.map((w) => {
+    const pad = Math.max(3, Math.round((w.bbox.y1 - w.bbox.y0) * 0.15));
+    return { x: w.bbox.x0 - pad, y: w.bbox.y0 - pad, w: w.bbox.x1 - w.bbox.x0 + 2 * pad, h: w.bbox.y1 - w.bbox.y0 + 2 * pad };
   });
+
+  async function analyserCerbere() {
+    const items = [];
+    const sensibles = K.cerbere.sensibles.map((s) => ({ ...s, n: s.exact ? s.mot : norm(s.mot) }));
+    const detection = rules().concat(S.extra, [{ id: "date", type: "DATE", re: DATE_RE() }]);
+    for (const [pi, p] of S.pages.entries()) {
+      await ocr(p);
+      const cache = couvert(p);
+      const vu = new Set();
+      const ajouter = (it) => {
+        const k = it.label + "|" + it.texte;
+        if (vu.has(k)) { const old = items.find((x) => x.page === pi && x.label + "|" + x.texte === k); if (old) old.rects.push(...it.rects); return; }
+        vu.add(k); items.push({ ...it, page: pi });
+      };
+      for (const line of p.lines) {
+        // Mots visibles et lus avec assez d'assurance (on écarte le « bruit » de lecture, par exemple au bord des zones noires).
+        const visibles = line.words.filter((w) => (w.conf == null || w.conf >= 60) && !cache((w.bbox.x0 + w.bbox.x1) / 2, (w.bbox.y0 + w.bbox.y1) / 2));
+        // Tête 1 : noms probables
+        chercher(K.cerbere.regles, visibles).forEach((h) => {
+          const mots = h.regle.id === "nom-titre" ? h.mots.slice(1) : h.mots; // on garde la civilité visible
+          if (mots.length) ajouter({ tete: 1, label: h.regle.label, texte: mots.map((w) => w.text).join(" "), rects: rectsDe(mots) });
+        });
+        // Tête 3 : numéros, dates, adresses encore visibles
+        chercher(detection, visibles).forEach((h) => ajouter({ tete: 3, label: "Encore visible : " + h.regle.type.toLowerCase(), texte: h.texte, rects: rectsDe(h.mots) }));
+        // Tête 2 : mots sensibles (signalés, à laisser si l'IA en a besoin)
+        const texteNorm = visibles.map((w) => ({ w, n: norm(w.text.replace(/[.,;:()«»"]/g, "")), e: w.text.replace(/[.,;:()«»"]/g, "") }));
+        for (const s of sensibles) {
+          const parts = s.n.split(/\s+/);
+          for (let i = 0; i + parts.length <= texteNorm.length; i++) {
+            const ok = parts.every((pt, j) => (s.exact ? texteNorm[i + j].e === pt : texteNorm[i + j].n === pt));
+            if (ok) {
+              const mots = texteNorm.slice(i, i + parts.length).map((x) => x.w);
+              ajouter({ tete: 2, label: "Mot sensible", texte: s.mot, rects: rectsDe(mots), info: true });
+            }
+          }
+        }
+      }
+      // Tête 3 : codes-barres et codes 2D, quand le téléphone sait les reconnaître (hors ligne)
+      if ("BarcodeDetector" in window) {
+        try {
+          const formats = await BarcodeDetector.getSupportedFormats();
+          const codes = await new BarcodeDetector({ formats }).detect(p.img);
+          codes.forEach((c) => {
+            const b = c.boundingBox;
+            let vus = 0, total = 0;
+            for (let gx = 0; gx <= 4; gx++) for (let gy = 0; gy <= 4; gy++) {
+              total++; if (!cache(b.x + (b.width * gx) / 4, b.y + (b.height * gy) / 4)) vus++;
+            }
+            if (vus / total > 0.2) ajouter({ tete: 3, label: "Code-barres ou code 2D", texte: c.format.replace(/_/g, " "), rects: [{ x: b.x - 6, y: b.y - 6, w: b.width + 12, h: b.height + 12 }] });
+          });
+        } catch (e) { /* pas de lecteur de codes sur cet appareil */ }
+      }
+    }
+    return items.sort((a, b) => a.tete - b.tete);
+  }
+
+  function afficherCerbere() {
+    const ul = $("cerbereList");
+    ul.textContent = "";
+    const restants = cerbereItems.filter((it) => !it.fait);
+    $("cerbereIntro").textContent = restants.length
+      ? `Cerbère a trouvé ${restants.length} point${restants.length > 1 ? "s" : ""} à vérifier dans ce qui reste visible.`
+      : "Rien à signaler. Vous pouvez envoyer.";
+    $("cerbereSend").textContent = restants.length ? "Envoyer quand même" : "Envoyer";
+    cerbereItems.forEach((it, i) => {
+      if (it.fait) return;
+      const li = document.createElement("li");
+      li.className = "cerbere-item";
+      const t = document.createElement("button");
+      t.type = "button"; t.className = "cerbere-voir";
+      const l = document.createElement("strong"); l.textContent = it.label;
+      const v = document.createElement("span"); v.textContent = "« " + it.texte + " »" + (S.pages.length > 1 ? ` · page ${it.page + 1}` : "");
+      t.append(l, v);
+      t.addEventListener("click", () => montrer(it));
+      const m = document.createElement("button"); m.type = "button"; m.className = "btn small dark"; m.textContent = "Masquer";
+      m.addEventListener("click", () => {
+        const p = S.pages[it.page];
+        it.rects.forEach((r) => maskRect(p, r));
+        it.fait = true; S.flash = null; afterEdit(); afficherCerbere();
+      });
+      const g = document.createElement("button"); g.type = "button"; g.className = "btn small"; g.textContent = "Laisser";
+      g.addEventListener("click", () => { it.fait = true; S.flash = null; render(); afficherCerbere(); });
+      const act = document.createElement("div"); act.className = "cerbere-act"; act.append(m, g);
+      li.append(t, act);
+      ul.append(li);
+    });
+  }
+
+  function montrer(it) {
+    if (it.page !== S.cur) { S.cur = it.page; fitView(); updateUI(); }
+    S.flash = { page: S.pages[it.page], rects: it.rects };
+    render();
+  }
+
+  async function avecCerbere(action) {
+    if (!$("optMask").checked || cerbereOk === S.version) return action();
+    if (busy) { setStatus("Lecture du texte en cours, patientez un instant."); return; }
+    const direct = S.pages.every((p) => p.lines);
+    let items;
+    try { setStatus("Cerbère vérifie ce qui reste visible…", true); items = await analyserCerbere(); }
+    catch (e) { items = []; }
+    setStatus("");
+    if (!items.length && direct) { cerbereOk = S.version; return action(); }
+    cerbereItems = items; cerbereSuite = action;
+    closeSheet();
+    $("cerbere").hidden = false; // sans voile sombre : l'image reste visible au-dessus
+    afficherCerbere();
+  }
+  function fermerCerbere() { $("cerbere").hidden = true; $("backdrop").hidden = true; S.flash = null; render(); }
+  $("cerbereBack").addEventListener("click", fermerCerbere);
+  $("cerbereSend").addEventListener("click", () => {
+    const suite = cerbereSuite;
+    cerbereOk = S.version; fermerCerbere();
+    if (suite) suite(); // appelé directement dans le toucher : le partage et la copie restent autorisés
+  });
+  $("btnCerbere").addEventListener("click", () => { cerbereOk = -1; closeSheet(); avecCerbere(() => setStatus("Cerbère : rien d'autre à signaler.")); });
 
   /* ------------------------------------------------------------ exemple */
   function demoPage() {

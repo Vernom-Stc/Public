@@ -12,6 +12,8 @@ Kerckhoffs efface les informations personnelles d'une photo ou d'un document ava
 
 **Dossier.** Plusieurs pages, détection automatique des noms et numéros, puis export en PDF, en image allégée ou en texte seul. Un nom devient `[PERSONNE_1]`, un numéro AVS devient `[AVS_1]`. Vous lisez la réponse de l'IA avec votre original sous les yeux : vous savez qui est qui.
 
+**Cerbère**, le gardien à trois têtes, relit avant chaque envoi ce qui reste visible et signale ce qui pourrait encore vous trahir : un nom après « Monsieur », un mot sensible, un code-barres, une date oubliée. Il propose, vous décidez. Ses règles sont dans `rules/cerbere.js`.
+
 Dans les deux cas, vous pouvez aussi **alléger** l'image sans rien masquer : elle sera plus légère à envoyer et contiendra moins d'informations inutiles.
 
 ## Pourquoi vous pouvez lui faire confiance

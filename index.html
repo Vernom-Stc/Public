@@ -44,7 +44,7 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.3.3 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.3.4 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -133,8 +133,25 @@
       <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées.</p>
     </div>
 
+    <div class="group">
+      <button class="btn" id="btnCerbere" type="button">Vérifier avec Cerbère</button>
+      <p class="hint">Cerbère relit ce qui reste visible et signale ce qui pourrait encore vous trahir. Il vérifie aussi tout seul avant chaque envoi.</p>
+    </div>
+
     <p class="status" id="status" role="status"></p>
     <p class="legend" id="legend" hidden></p>
+  </section>
+
+  <!-- Cerbère : le rapport avant envoi -->
+  <section class="sheet cerbere" id="cerbere" hidden aria-label="Cerbère">
+    <div class="sheet-head"><h3>Cerbère</h3></div>
+    <p id="cerbereIntro"></p>
+    <ul class="cerbere-list" id="cerbereList"></ul>
+    <p class="hint">Touchez un point pour le voir sur l'image. Cerbère ne masque rien tout seul : vous décidez.</p>
+    <div class="cerbere-foot">
+      <button class="btn" id="cerbereBack" type="button">Revenir</button>
+      <button class="btn primary" id="cerbereSend" type="button">Envoyer</button>
+    </div>
   </section>
 </main>
 
@@ -143,6 +160,7 @@
 <script src="vendor/tesseract/tesseract.min.js"></script>
 <script src="rules/registre.js"></script>
 <script src="rules/commun.js"></script>
+<script src="rules/cerbere.js"></script>
 <!-- Un fichier par pays : voir rules/LISEZMOI.md -->
 <script src="rules/pays/ch.js"></script>
 <script src="app.js"></script>

@@ -16,7 +16,11 @@
  *            Ils sont vérifiés automatiquement par rules/tester.js.
  */
 (function (g) {
-  var K = (g.Kerckhoffs = g.Kerckhoffs || { commun: [], pays: {} });
+  var K = (g.Kerckhoffs = g.Kerckhoffs || { commun: [], pays: {}, cerbere: { regles: [], sensibles: [] } });
+  K.ajouterCerbere = function (c) {
+    K.cerbere.regles.push.apply(K.cerbere.regles, c.regles || []);
+    K.cerbere.sensibles.push.apply(K.cerbere.sensibles, c.sensibles || []);
+  };
   K.ajouterCommun = function (regles) { K.commun.push.apply(K.commun, regles); };
   K.ajouterPays = function (p) {
     if (!p || !p.code || !p.nom || !Array.isArray(p.regles)) throw new Error("Pays mal décrit : il faut code, nom et regles.");
