@@ -237,7 +237,7 @@
       c.textAlign = "center"; c.textBaseline = "middle";
       c.fillText(b.token, b.x + b.w / 2, b.y + b.h / 2, b.w - 4);
     } else if (!final) {
-      c.setLineDash([10, 6]); c.lineWidth = Math.max(2, cv.width / 600); c.strokeStyle = "#2B50C8";
+      c.setLineDash([10, 6]); c.lineWidth = Math.max(2, cv.width / 600); c.strokeStyle = "#002366";
       c.strokeRect(b.x, b.y, b.w, b.h);
     }
     if (!final && b.active && b.flag) {
