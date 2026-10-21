@@ -173,3 +173,9 @@ input[type=text],select{
 .group{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 .group h4{margin:0;font-size:.95rem}
 .group label{font-size:.85rem;font-weight:600}
+.selbar{position:absolute;left:10px;right:10px;top:10px;z-index:4;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.selbar .btn{flex:1 1 auto}
+.btn.dark{background:#000;border-color:#000;color:#fff}
+.selbar{flex-wrap:nowrap}
+.selbar #selCancel{flex:0 0 auto;min-width:44px}
+.selbar .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

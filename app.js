@@ -49,6 +49,8 @@
     view: { s: 1, tx: 0, ty: 0 },
     version: 0,         // change à chaque modification
     cache: null,        // { key, out } dernier export préparé
+    extra: [],          // motifs ajoutés par « Masquer tous les pareils » (pour cette session)
+    sel: null,          // zone sélectionnée au rectangle : { page, rect }
     leaving: false,
   };
   const cv = $("cv");
@@ -88,6 +90,7 @@
 
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
+    S.extra = []; S.sel = null; $("selbar").hidden = true;
     history.length = 0;
     ["tNames", "tAddr", "tOther"].forEach((id) => { $(id).value = ""; });
     $("optMask").checked = true;
@@ -266,19 +269,26 @@
   }
 
   function drawBox(c, b, final) {
+    const rects = b.rects || [b];
     c.save();
     if (b.active) {
-      c.fillStyle = "#000"; c.fillRect(b.x, b.y, b.w, b.h);
-      const fs = Math.max(9, Math.min(b.h * 0.6, b.w / (b.token.length * 0.62)));
-      c.fillStyle = "#fff"; c.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
-      c.textAlign = "center"; c.textBaseline = "middle";
-      c.fillText(b.token, b.x + b.w / 2, b.y + b.h / 2, b.w - 4);
+      c.fillStyle = "#000";
+      rects.forEach((r) => c.fillRect(r.x, r.y, r.w, r.h));
+      // L'étiquette va dans le plus large rectangle, si elle y tient.
+      const r = rects.reduce((m, x) => (x.w > m.w ? x : m), rects[0]);
+      const fs = Math.min(r.h * 0.6, r.w / (b.token.length * 0.62));
+      if (fs >= 7) {
+        c.fillStyle = "#fff"; c.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
+        c.textAlign = "center"; c.textBaseline = "middle";
+        c.fillText(b.token, r.x + r.w / 2, r.y + r.h / 2, r.w - 4);
+      }
     } else if (!final) {
       c.setLineDash([10, 6]); c.lineWidth = Math.max(2, cv.width / 600); c.strokeStyle = "#002366";
-      c.strokeRect(b.x, b.y, b.w, b.h);
+      rects.forEach((r) => c.strokeRect(r.x, r.y, r.w, r.h));
     }
     if (!final && b.active && b.flag) {
-      c.lineWidth = Math.max(3, cv.width / 400); c.strokeStyle = "#e08a1e"; c.strokeRect(b.x, b.y, b.w, b.h);
+      c.lineWidth = Math.max(3, cv.width / 400); c.strokeStyle = "#e08a1e";
+      rects.forEach((r) => c.strokeRect(r.x, r.y, r.w, r.h));
     }
     c.restore();
   }
@@ -289,7 +299,19 @@
     p.strokes.forEach((st) => strokePath(c, st));
     p.boxes.forEach((b) => drawBox(c, b, final));
   }
-  function render() { const p = page(); if (p) paint(ctx, p, true, false); }
+  function render() {
+    const p = page(); if (!p) return;
+    paint(ctx, p, true, false);
+    // Zone sélectionnée au rectangle : en surbrillance, en attente d'un choix.
+    if (S.sel && S.sel.page === p) {
+      const r = S.sel.rect;
+      ctx.save();
+      ctx.fillStyle = "rgba(60,110,230,.28)"; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.setLineDash([12, 8]); ctx.lineWidth = Math.max(3, cv.width / 400); ctx.strokeStyle = "#2b5fe0";
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.restore();
+    }
+  }
 
   /* ---------------------- doigt : pinceau, rectangle, gomme, zoom, retour */
   const ptrs = new Map();
@@ -305,10 +327,11 @@
 
   document.querySelectorAll('input[name="tool"]').forEach((r) => r.addEventListener("change", () => {
     tool = r.value;
+    if (S.sel) unselect();
     const hints = {
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
-      rect: "Glissez en diagonale : toute la zone devient noire. Idéal pour une ligne de texte ou un visage.",
+      rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, ou masquer tous les pareils (par exemple toutes les dates).",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
     if (page()) setStatus(hints[tool]);
@@ -333,7 +356,10 @@
     }
     return -1;
   }
-  const hitBox = (p, x, y) => [...p.boxes].reverse().find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+  const hitBox = (p, x, y) => {
+    const t = 8 / S.view.s;
+    return [...p.boxes].reverse().find((b) => (b.rects || [b]).some((r) => x >= r.x - t && x <= r.x + r.w + t && y >= r.y - t && y <= r.y + r.h + t));
+  };
 
   function toggleBox(p, b) { b.active = !b.active; history.push({ type: "toggle", page: p, item: b }); }
   function eraseAt(p, x, y) {
@@ -417,7 +443,8 @@
       if (hit) { toggleBox(p, hit); afterEdit(); return; }
       if (d.kind === "rect") { render(); return; }
     }
-    const item = d.kind === "rect" ? { kind: "rect", x: d.x, y: d.y, w: d.w, h: d.h } : d;
+    if (d.kind === "rect") { select(p, { x: d.x, y: d.y, w: d.w, h: d.h }); return; }
+    const item = d;
     p.strokes.push(item);
     history.push({ type: "add", page: p, item });
     afterEdit();
@@ -451,6 +478,75 @@
       break;
     }
     afterEdit();
+  });
+
+  /* ------------------------------ sélection au rectangle : masquer, ou tous les pareils */
+  const MOIS = "janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre";
+  const DATE_RE = () => new RegExp(`(?:\\b\\d{1,2}[./-]\\d{1,2}[./-](?:\\d{4}|\\d{2})\\b|(?:\\b\\d{1,2}(?:er)?\\s+)?(?:${MOIS})\\s+\\d{4}\\b)`, "gi");
+
+  function select(p, rect) {
+    S.sel = { page: p, rect };
+    $("selbar").hidden = false;
+    render();
+  }
+  function unselect() { S.sel = null; $("selbar").hidden = true; render(); }
+
+  function maskRect(p, rect) {
+    const item = { kind: "rect", x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    p.strokes.push(item);
+    history.push({ type: "add", page: p, item });
+  }
+
+  // Transforme le texte sélectionné en un motif : une date, une forme de numéro, ou le mot lui-même.
+  function motifDe(texte) {
+    const t = texte.trim();
+    const d = DATE_RE();
+    if (d.test(t)) return { kind: "regle", sg: "date", pl: "dates", fem: true, regle: { id: "sel-date", type: "DATE", re: DATE_RE() } };
+    if (/\d/.test(t)) {
+      const forme = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\d/g, "\\d").replace(/\s+/g, "\\s?");
+      const re = new RegExp((/^\w/.test(t) ? "\\b" : "") + forme + (/\w$/.test(t) ? "\\b" : ""), "gi");
+      return { kind: "regle", sg: "élément de même forme", pl: "éléments de même forme", fem: false, regle: { id: "sel-" + S.extra.length, type: "MOTIF", re } };
+    }
+    return { kind: "terme", sg: "occurrence", pl: "occurrences", fem: true, terme: t };
+  }
+
+  $("selMask").addEventListener("click", () => {
+    if (!S.sel) return;
+    maskRect(S.sel.page, S.sel.rect);
+    S.sel = null; $("selbar").hidden = true;
+    afterEdit();
+  });
+  $("selCancel").addEventListener("click", unselect);
+  $("selbar").addEventListener("pointerdown", (e) => e.stopPropagation()); // les boutons ne dessinent pas
+  $("selAll").addEventListener("click", async () => {
+    if (!S.sel || busy) return;
+    const { page: p, rect } = S.sel;
+    S.sel = null; $("selbar").hidden = true;
+    try {
+      setStatus("Lecture du texte…", true);
+      await ocr(p);
+    } catch (e) { setStatus("La lecture du texte a échoué : la zone a été masquée seule."); maskRect(p, rect); afterEdit(); return; }
+    const dedans = [];
+    p.lines.forEach((l) => l.words.forEach((w) => {
+      const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
+      if (cx >= rect.x && cx <= rect.x + rect.w && cy >= rect.y && cy <= rect.y + rect.h) dedans.push(w.text);
+    }));
+    if (!dedans.length) { maskRect(p, rect); afterEdit(); setStatus("Aucun texte lu dans cette zone : elle a été masquée seule."); return; }
+    const texte = dedans.join(" ").replace(/[,;:]+$/, "");
+    const m = motifDe(texte);
+    let type;
+    if (m.kind === "regle") { S.extra.push(m.regle); type = m.regle.type; }
+    else {
+      const champ = $("tOther");
+      champ.value = champ.value.trim() ? champ.value.trim() + ", " + m.terme : m.terme;
+      type = "DONNEE";
+    }
+    S.tokens = new Map(); S.counters = {};
+    await detectPages(S.pages, () => {
+      const n = S.pages.reduce((s, q) => s + q.boxes.filter((b) => b.active && b.token.startsWith("[" + type + "_")).length, 0);
+      if (!n) { maskRect(p, rect); afterEdit(); return "Rien de semblable trouvé : la zone a été masquée seule."; }
+      return `${n} ${n > 1 ? m.pl : m.sg} masqué${m.fem ? "e" : ""}${n > 1 ? "s" : ""} sur tout le document (« ${texte} »). Touchez une zone pour la démasquer.`;
+    });
   });
 
   /* --------------------------------------------- lecture (OCR) et détection */
@@ -529,15 +625,19 @@
         ranges.forEach(([a, b], i) => { if (a < e && b > s) idx.push(i); });
         if (!idx.length || idx.some((i) => used.has(i))) return;
         idx.forEach((i) => used.add(i));
-        const bb = idx.map((i) => words[i].bbox), pad = 4;
-        const x0 = Math.min(...bb.map((b) => b.x0)) - pad, y0 = Math.min(...bb.map((b) => b.y0)) - pad;
-        const x1 = Math.max(...bb.map((b) => b.x1)) + pad, y1 = Math.max(...bb.map((b) => b.y1)) + pad;
-        const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, key, token: tokenFor(key, type, value), words: idx.map((i) => words[i]), active: true, flag };
+        // Un rectangle par mot, collé au haut et au bas des lettres : il suit la ligne même si la photo est penchée.
+        const bb = idx.map((i) => words[i].bbox);
+        const hMax = Math.max(...bb.map((b) => b.y1 - b.y0));
+        const pad = Math.max(3, Math.round(hMax * 0.15));
+        const rects = bb.map((b) => ({ x: b.x0 - pad, y: b.y0 - pad, w: b.x1 - b.x0 + 2 * pad, h: b.y1 - b.y0 + 2 * pad }));
+        const x0 = Math.min(...rects.map((r) => r.x)), y0 = Math.min(...rects.map((r) => r.y));
+        const x1 = Math.max(...rects.map((r) => r.x + r.w)), y1 = Math.max(...rects.map((r) => r.y + r.h));
+        const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, rects, key, token: tokenFor(key, type, value), words: idx.map((i) => words[i]), active: true, flag };
         const was = previous.get(key + "@" + box.x + "," + box.y);
         if (was === false) box.active = false;
         p.boxes.push(box);
       };
-      for (const r of rules()) {
+      for (const r of rules().concat(S.extra)) {
         r.re.lastIndex = 0;
         let m;
         while ((m = r.re.exec(raw))) {
@@ -559,7 +659,7 @@
     }
   }
 
-  async function detectPages(list) {
+  async function detectPages(list, message) {
     if (busy) return;
     busy = true; $("detect").disabled = true;
     setStatus("Lecture du texte… (jusqu'à une minute la première fois)", true);
@@ -573,7 +673,7 @@
       changed(); render();
       const n = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.active).length, 0);
       const flagged = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.flag).length, 0);
-      setStatus(n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
+      if (message) setStatus(message()); else setStatus(n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
                   : (S.mode === "quick"
                       ? "Rien trouvé automatiquement. Pour les noms, écrivez-les dans « Réglages », ou effacez-les au doigt."
                       : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher."));

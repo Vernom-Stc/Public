@@ -44,7 +44,7 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.3.2 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.3.3 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -62,6 +62,11 @@
     <canvas id="cv" width="10" height="10"></canvas>
     <p class="toast" id="toast" role="status" hidden></p>
     <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <div class="selbar" id="selbar" hidden>
+      <button class="btn small dark" id="selMask" type="button">Masquer</button>
+      <button class="btn small primary" id="selAll" type="button">Masquer tous les pareils</button>
+      <button class="btn small" id="selCancel" type="button" aria-label="Annuler la sélection">✕</button>
+    </div>
     <div class="empty" id="empty">
       <div class="empty-inner">
         <button class="btn primary" id="emptyCam" type="button">Prendre une photo</button>
