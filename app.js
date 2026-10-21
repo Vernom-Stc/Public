@@ -37,7 +37,17 @@
   const page = () => S.pages[S.cur];
   const changed = () => { S.version++; };
 
-  function setStatus(t) { $("status").textContent = t || ""; }
+  // Le message s'affiche sous l'image et, bien visible, par-dessus l'image.
+  let busy = false;
+  let toastTimer = null;
+  function setStatus(t, keep) {
+    $("status").textContent = t || "";
+    const el = $("toast");
+    clearTimeout(toastTimer);
+    if (!t || $("work").hidden) { el.hidden = true; return; }
+    el.textContent = t; el.hidden = false;
+    if (!keep && !busy) toastTimer = setTimeout(() => { el.hidden = true; }, 6000);
+  }
 
   /* ------------------------------------------------------------ navigation */
   function openWork(mode) {
@@ -331,8 +341,8 @@
         workerBlobURL: false,
         cacheMethod: "none",
         logger: (m) => {
-          if (m.status === "recognizing text") setStatus(`Lecture du texte… ${Math.round(m.progress * 100)} %`);
-          else if (m.status && m.progress < 1) setStatus("Préparation du moteur de lecture…");
+          if (m.status === "recognizing text") setStatus(`Lecture du texte… ${Math.round(m.progress * 100)} %`, true);
+          else if (m.status && m.progress < 1) setStatus("Préparation du moteur de lecture…", true);
         },
       }).catch((e) => { workerP = null; throw e; });
     }
@@ -426,10 +436,10 @@
     }
   }
 
-  let busy = false;
   async function detectPages(list) {
     if (busy) return;
     busy = true; $("detect").disabled = true;
+    setStatus("Lecture du texte… (jusqu'à une minute la première fois)", true);
     try {
       for (let i = 0; i < list.length; i++) {
         if (!S.pages.includes(list[i])) continue;
@@ -441,9 +451,11 @@
       const n = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.active).length, 0);
       const flagged = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.flag).length, 0);
       setStatus(n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
-                  : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher.");
+                  : (S.mode === "quick"
+                      ? "Aucun numéro trouvé. En photo rapide, « Détecter » repère les numéros AVS, IBAN, téléphones et e-mails, pas les noms : effacez-les au doigt, ou utilisez le mode Dossier."
+                      : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher."));
     } catch (e) {
-      setStatus("La lecture du texte a échoué. Effacez au doigt, ou réessayez.");
+      setStatus("La lecture du texte a échoué (" + ((e && (e.message || e)) + "").slice(0, 120) + "). Effacez au doigt, ou réessayez.");
     } finally {
       busy = false; $("detect").disabled = !S.pages.length;
       updateUI();
