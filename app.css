@@ -5,9 +5,9 @@
   --ink:#14202b;        /* texte */
   --muted:#5a6872;      /* texte secondaire */
   --line:#d3dad8;       /* filets */
-  --accent:#1f5f8b;     /* actions */
+  --accent:#2B50C8;     /* bleu roi */
   --accent-ink:#ffffff;
-  --accent-soft:#e1edf5;
+  --accent-soft:#e6ebfa;
   --ok:#2d7a4e;
   --warn:#a5621a;
   --stage:#2a333b;      /* fond derrière le document */
@@ -18,7 +18,7 @@
 @media (prefers-color-scheme: dark){
   :root{
     --paper:#10161b; --sheet:#182128; --ink:#e5ebee; --muted:#9aa7b0; --line:#2a3741;
-    --accent:#6aaedb; --accent-ink:#0c1419; --accent-soft:#1b3242; --ok:#5fbf88; --warn:#e0a356;
+    --accent:#8ea4f2; --accent-ink:#0c1419; --accent-soft:#1d2a52; --ok:#5fbf88; --warn:#e0a356;
     --stage:#0a0e11; color-scheme:dark;
   }
 }
