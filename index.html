@@ -45,7 +45,7 @@
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
   <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.4.1 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.4.2 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -95,12 +95,17 @@
 
   <!-- Caméra intégrée : la photo ne passe jamais par la galerie -->
   <div class="camview" id="camView" hidden>
-    <video id="camVideo" playsinline muted autoplay></video>
+    <div class="cam-stage">
+      <video id="camVideo" playsinline muted autoplay></video>
+      <span class="cam-focus" id="camFocus" hidden></span>
+      <p class="cam-tip">Touchez le document pour faire la mise au point. Tenez le téléphone à 20–30 cm, bien parallèle à la feuille.</p>
+    </div>
     <div class="cambar">
       <button class="btn small" id="camCancel" type="button">Annuler</button>
       <button class="shutter" id="camShot" type="button" aria-label="Prendre la photo"></button>
-      <span class="cam-note">Cette photo ne va pas dans la galerie</span>
+      <button class="btn small" id="camTorch" type="button" aria-pressed="false" hidden>Lampe</button>
     </div>
+    <p class="cam-note">Cette photo ne va pas dans la galerie. <button class="link" id="camSysteme" type="button">Utiliser l'appareil photo du téléphone</button></p>
   </div>
   <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
 

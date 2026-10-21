@@ -233,14 +233,43 @@
 
   /* ------------- caméra intégrée : la photo reste sur l'ardoise, jamais dans la galerie */
   let flux = null;
+  const piste = () => (flux ? flux.getVideoTracks()[0] : null);
+  const VIDEO = { width: { ideal: 4096 }, height: { ideal: 3072 } };
+
+  // Sur les téléphones à plusieurs objectifs, on évite l'ultra grand-angle (souvent sans mise au point) :
+  // on préfère l'objectif arrière principal, en général le premier listé (« camera2 0, facing back »).
+  async function meilleureCameraArriere() {
+    try {
+      const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+      const arriere = cams.filter((d) => /back|arri|rear|environment/i.test(d.label));
+      if (!arriere.length) return null;
+      const num = (d) => { const m = d.label.match(/camera2?\s*(\d+)/i); return m ? +m[1] : 99; };
+      return arriere.sort((x, y) => num(x) - num(y))[0].deviceId;
+    } catch (e) { return null; }
+  }
+
+  async function reglerMiseAuPoint() {
+    const t = piste(); if (!t || !t.getCapabilities) return;
+    const cap = t.getCapabilities();
+    const avance = {};
+    if (cap.focusMode && cap.focusMode.includes("continuous")) avance.focusMode = "continuous";
+    if (cap.exposureMode && cap.exposureMode.includes("continuous")) avance.exposureMode = "continuous";
+    if (cap.whiteBalanceMode && cap.whiteBalanceMode.includes("continuous")) avance.whiteBalanceMode = "continuous";
+    if (Object.keys(avance).length) { try { await t.applyConstraints({ advanced: [avance] }); } catch (e) {} }
+    $("camTorch").hidden = !cap.torch;
+  }
+
   async function ouvrirCamera() {
     closeSheet();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("inCam").click(); return; }
     try {
-      flux = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
-        audio: false,
-      });
+      flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, ...VIDEO }, audio: false });
+      // Une fois l'accès accordé, les noms des caméras sont connus : on bascule sur l'objectif principal si besoin.
+      const id = await meilleureCameraArriere();
+      if (id && piste().getSettings().deviceId !== id) {
+        flux.getTracks().forEach((t) => t.stop());
+        flux = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, ...VIDEO }, audio: false });
+      }
     } catch (e) {
       setStatus("La caméra n'est pas autorisée pour Kerckhoffs : l'appareil photo du téléphone va s'ouvrir, et il peut ranger la photo dans la galerie.");
       $("inCam").click();
@@ -249,7 +278,9 @@
     const v = $("camVideo");
     v.srcObject = flux;
     $("camView").hidden = false;
+    torche = false; $("camTorch").setAttribute("aria-pressed", "false");
     try { await v.play(); } catch (e) {}
+    reglerMiseAuPoint();
   }
   function fermerCamera() {
     if (flux) flux.getTracks().forEach((t) => t.stop());
@@ -257,12 +288,54 @@
     $("camVideo").srcObject = null;
     $("camView").hidden = true;
   }
-  $("camShot").addEventListener("click", () => {
+
+  // Toucher l'image : mise au point à cet endroit, quand le téléphone le permet.
+  $("camVideo").addEventListener("click", async (e) => {
+    const t = piste(); if (!t || !t.getCapabilities) return;
+    const cap = t.getCapabilities(), r = e.currentTarget.getBoundingClientRect();
+    const pt = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+    const anneau = $("camFocus");
+    anneau.style.left = (e.clientX - r.left) + "px"; anneau.style.top = (e.clientY - r.top) + "px";
+    anneau.hidden = false; setTimeout(() => { anneau.hidden = true; }, 900);
+    try {
+      const avance = { pointsOfInterest: [pt] };
+      if (cap.focusMode && cap.focusMode.includes("single-shot")) avance.focusMode = "single-shot";
+      await t.applyConstraints({ advanced: [avance] });
+      setTimeout(reglerMiseAuPoint, 1500); // puis retour à la mise au point continue
+    } catch (err) {}
+  });
+
+  let torche = false;
+  $("camTorch").addEventListener("click", async () => {
+    const t = piste(); if (!t) return;
+    torche = !torche;
+    try { await t.applyConstraints({ advanced: [{ torch: torche }] }); } catch (e) { torche = false; }
+    $("camTorch").setAttribute("aria-pressed", torche ? "true" : "false");
+  });
+
+  $("camShot").addEventListener("click", async () => {
     const v = $("camVideo");
     if (!v.videoWidth) return;
-    const c = toCanvas(v, v.videoWidth, v.videoHeight); // l'image est copiée sur l'ardoise, rien n'est écrit sur le téléphone
+    $("camShot").disabled = true;
+    let c = null;
+    // Une vraie photo (meilleure netteté) si le téléphone le permet, sinon une image de la vidéo.
+    // Dans les deux cas, elle reste en mémoire : rien n'est écrit sur le téléphone.
+    try {
+      if ("ImageCapture" in window) {
+        const blob = await new ImageCapture(piste()).takePhoto();
+        const im = await createImageBitmap(blob);
+        c = toCanvas(im, im.width, im.height); im.close && im.close();
+      }
+    } catch (e) { c = null; }
+    if (!c) c = toCanvas(v, v.videoWidth, v.videoHeight);
+    $("camShot").disabled = false;
     fermerCamera();
     estUnProfil(c).then((profil) => { if (!profil) addPages([newPage(c, "photo")]); });
+  });
+  $("camSysteme").addEventListener("click", () => {
+    fermerCamera();
+    setStatus("Appareil photo du téléphone : il peut ranger la photo dans la galerie. Pensez à la supprimer ensuite.");
+    $("inCam").click();
   });
   $("camCancel").addEventListener("click", fermerCamera);
   $("btnCam").addEventListener("click", ouvrirCamera);
@@ -1393,7 +1466,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.1";
+  const VERSION_APP = "0.4.2";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

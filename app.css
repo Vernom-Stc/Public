@@ -194,14 +194,20 @@ input[type=text],select{
 
 /* caméra intégrée */
 .camview{position:fixed;inset:0;z-index:40;background:#000;display:flex;flex-direction:column}
-.camview video{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+.cam-stage{position:relative;flex:1;min-height:0}
+.camview video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 .cambar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;
-  padding-top:14px;padding-bottom:max(18px,env(safe-area-inset-bottom,0px));
+  padding-top:14px;padding-bottom:8px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .cambar .btn{justify-self:start}
+.cambar #camTorch{justify-self:end}
+.cambar #camTorch[aria-pressed="true"]{background:#ffd34d;border-color:#ffd34d;color:#000}
 .shutter{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #000;cursor:pointer}
 .shutter:active{transform:scale(.94)}
-.cam-note{color:#c9d3d9;font-size:.78rem;justify-self:end;text-align:right}
+.cam-note{color:#c9d3d9;font-size:.8rem;text-align:center;margin:0;padding:0 16px max(10px,env(safe-area-inset-bottom,0px))}
+.cam-note .link{color:#9ec0ff;font-size:.8rem}
+.cam-tip{position:absolute;left:12px;right:12px;top:max(12px,env(safe-area-inset-top,0px));margin:0;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.55);color:#fff;font-size:.82rem;text-align:center;pointer-events:none}
+.cam-focus{position:absolute;width:72px;height:72px;margin:-36px 0 0 -36px;border:2px solid #ffd34d;border-radius:50%;pointer-events:none}
 
 /* aperçu final et vérification de version */
 .overlay{position:fixed;inset:0;z-index:50;background:var(--paper);overflow-y:auto;
