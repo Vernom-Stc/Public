@@ -44,7 +44,7 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.3.1 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.3.2 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -95,6 +95,12 @@
       <button class="btn small" id="closeSheet" type="button">Fermer</button>
     </div>
 
+    <div class="group">
+      <label for="pays">Pays des documents</label>
+      <select id="pays"></select>
+      <p class="hint">Les règles de chaque pays sont dans le code, dossier rules/pays/. Chacun peut ajouter le sien.</p>
+    </div>
+
     <div class="group" id="termsPanel">
       <h4>Ce que Kerckhoffs doit masquer</h4>
       <label for="tNames">Noms et prénoms</label>
@@ -130,8 +136,10 @@
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script src="vendor/jspdf/jspdf.umd.min.js"></script>
 <script src="vendor/tesseract/tesseract.min.js"></script>
+<script src="rules/registre.js"></script>
 <script src="rules/commun.js"></script>
-<script src="rules/suisse.js"></script>
+<!-- Un fichier par pays : voir rules/LISEZMOI.md -->
+<script src="rules/pays/ch.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -43,7 +43,7 @@ puis ouvrez `http://localhost:8000`.
 
 Le projet est fourni **tel quel**. Il n'y a pas d'engagement de maintenance. Copiez-le, adaptez-le à votre pays, à votre métier ou à votre organisation, y compris dans une version fermée : la licence Apache 2.0 le permet.
 
-- Les règles de détection sont dans `rules/`. Pour un autre pays, copiez `rules/suisse.js` et adaptez-le, puis ajoutez-le dans `index.html`.
+- **Ajouter votre pays** : chaque pays a son fichier dans `rules/pays/` (la Suisse : `rules/pays/ch.js`). Copiez `rules/pays/_modele.js`, remplissez-le, et vérifiez avec `node rules/tester.js`. Tout est expliqué dans [rules/LISEZMOI.md](rules/LISEZMOI.md).
 - La langue de lecture des textes est le français (`vendor/tesseract/lang/fra.traineddata.gz`). D'autres langues sont disponibles dans les paquets `@tesseract.js-data`.
 - Après chaque modification, changez `VERSION` dans `sw.js`.
 
@@ -67,4 +67,4 @@ Le nom rend hommage à Auguste Kerckhoffs, qui écrivait en 1883 dans *La Crypto
 
 ## English summary
 
-Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Use **Quick photo** to erase anything with your finger and paste the image into an AI, or **Folder** for multi-page documents with automatic detection of names and numbers, exported as PDF, lightened image or plain text. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the Apache 2.0 license; copy and adapt it freely.
+Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Use **Quick photo** to erase anything with your finger and paste the image into an AI, or **Folder** for multi-page documents with automatic detection of names and numbers, exported as PDF, lightened image or plain text. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the Apache 2.0 license; copy and adapt it freely. To add your country's rules, see [rules/LISEZMOI.md](rules/LISEZMOI.md).

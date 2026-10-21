@@ -83,7 +83,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 .panel summary{font-weight:700;cursor:pointer;min-height:28px}
 .fields{display:grid;gap:6px;margin-top:10px}
 .fields label{font-size:.85rem;font-weight:600}
-input[type=text]{
+input[type=text],select{
   width:100%;font:16px var(--ui);color:var(--ink);background:var(--paper);
   border:1px solid var(--line);border-radius:8px;padding:10px;
 }

@@ -13,7 +13,26 @@
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = abs("vendor/pdfjs/pdf.worker.min.js");
 
-  const RULES = (window.KERCKHOFFS_RULES || []).slice().sort((a, b) => (a.id === "longnum") - (b.id === "longnum"));
+  // Règles : communes + celles du pays choisi (rules/pays/*.js). Les longs numéros passent en dernier.
+  const K = window.Kerckhoffs;
+  let paysChoisi = "CH";
+  try { paysChoisi = localStorage.getItem("kerckhoffs-pays") || "CH"; } catch (e) {}
+  if (!K.pays[paysChoisi]) paysChoisi = Object.keys(K.pays)[0];
+  const rules = () => K.commun.concat(K.pays[paysChoisi] ? K.pays[paysChoisi].regles : [])
+    .sort((a, b) => (a.id === "longnum") - (b.id === "longnum"));
+  (function remplirPays() {
+    const sel = document.getElementById("pays");
+    Object.values(K.pays).sort((a, b) => a.nom.localeCompare(b.nom)).forEach((p) => {
+      const o = document.createElement("option");
+      o.value = p.code; o.textContent = p.nom; o.selected = p.code === paysChoisi;
+      sel.append(o);
+    });
+    sel.addEventListener("change", () => {
+      paysChoisi = sel.value;
+      try { localStorage.setItem("kerckhoffs-pays", paysChoisi); } catch (e) {}
+      if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
+    });
+  })();
 
   const FORMATS = {
     quick: [["image", "Image"], ["light", "Image allégée"], ["text", "Texte seul"]],
@@ -518,7 +537,7 @@
         if (was === false) box.active = false;
         p.boxes.push(box);
       };
-      for (const r of RULES) {
+      for (const r of rules()) {
         r.re.lastIndex = 0;
         let m;
         while ((m = r.re.exec(raw))) {

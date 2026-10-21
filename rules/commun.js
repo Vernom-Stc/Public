@@ -1,29 +1,20 @@
 /*
- * Kerckhoffs — règles de détection communes à tous les pays.
- *
- * Chaque règle : { id, label, type, re, check? }
- *   id    : identifiant unique (sert aussi pour la case à cocher)
- *   label : texte affiché à l'utilisateur
- *   type  : préfixe du jeton, ex. EMAIL donne [EMAIL_1]
- *   re    : expression régulière, avec le drapeau g
- *   check : fonction facultative ; si elle renvoie false, la zone est signalée « à relire »
- *   silent: avec check, ignore la zone au lieu de la signaler (pour écarter les faux positifs)
- *
- * Pour adapter Kerckhoffs à un autre pays, copiez rules/suisse.js et modifiez-le.
+ * Kerckhoffs — règles valables dans tous les pays.
+ * Format : voir rules/registre.js.
  */
-window.KERCKHOFFS_RULES = window.KERCKHOFFS_RULES || [];
-
-window.KERCKHOFFS_RULES.push(
+Kerckhoffs.ajouterCommun([
   {
     id: "email",
     label: "Adresses e-mail",
     type: "EMAIL",
-    re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g
+    re: /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g,
+    exemples: { trouve: ["jean.exemple@example.ch"], ignore: ["Rue du Lac 12"] }
   },
   {
     id: "longnum",
     label: "Longs numéros (8 chiffres ou plus)",
     type: "NUMERO",
-    re: /\b\d{8,}\b/g
+    re: /\b\d{8,}\b/g,
+    exemples: { trouve: ["48291736"], ignore: ["1234567"] }
   }
-);
+]);
