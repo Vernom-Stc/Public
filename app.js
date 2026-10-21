@@ -1082,10 +1082,10 @@
   }
 
   const blobOf = (c, type, q) => new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("export"))), type, q));
-  function stamp() {
-    const d = new Date(), z = (n) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`;
-  }
+  // Le nom du fichier ne contient que la date et un numéro : ni l'heure, ni le fuseau horaire.
+  let numeroExport = 0;
+  function jour() { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getUTCFullYear()}${z(d.getUTCMonth() + 1)}${z(d.getUTCDate())}`; }
+  function stamp() { numeroExport++; return `${jour()}-${numeroExport}`; }
 
   function strokeMask(p) {
     const k = 0.25, c = document.createElement("canvas");
@@ -1140,6 +1140,7 @@
         doc.addImage(c.toDataURL("image/jpeg", 0.85), "JPEG", 0, 0, c.width, c.height);
       }
       doc.setProperties({ title: "Document", author: "", subject: "", keywords: "", creator: "" });
+      doc.setCreationDate(`D:${jour()}000000+00'00'`); // la date seule, en heure universelle : rien sur le lieu ni l'heure
       return { files: [new File([doc.output("blob")], base + ".pdf", { type: "application/pdf" })] };
     }
     const files = [];
@@ -1691,7 +1692,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.8";
+  const VERSION_APP = "0.5.9";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
