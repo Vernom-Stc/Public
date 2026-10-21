@@ -44,29 +44,59 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.2.8 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.3.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
-<!-- ============ ESPACE DE TRAVAIL ============ -->
-<main id="work" class="screen" hidden>
+<!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
+<main id="work" class="editor" hidden>
   <header class="bar">
     <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">Accueil</button>
     <h2 id="workTitle">Photo rapide</h2>
     <span class="pageinfo" id="pageInfo"></span>
+    <button class="btn primary small" id="btnCam" type="button">Photo</button>
   </header>
 
-  <!-- Ajout de pages -->
-  <div class="adders" id="adders">
-    <button class="btn primary" id="btnCam" type="button">Prendre une photo</button>
-    <button class="btn" id="btnFile" type="button">Importer</button>
-    <input type="file" id="inCam" accept="image/*" capture="environment" hidden>
-    <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
+  <div class="pages" id="pages" hidden></div>
+
+  <div class="viewport" id="viewport">
+    <canvas id="cv" width="10" height="10"></canvas>
+    <p class="toast" id="toast" role="status" hidden></p>
+    <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <div class="empty" id="empty">
+      <div class="empty-inner">
+        <button class="btn primary" id="emptyCam" type="button">Prendre une photo</button>
+        <button class="btn ghost" id="emptyFile" type="button">Importer une image ou un PDF</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Termes à masquer (dossier) -->
-  <details class="panel" id="termsPanel" open>
-    <summary>Ce que Kerckhoffs doit masquer</summary>
-    <div class="fields">
+  <div class="toolbar" role="radiogroup" aria-label="Outil">
+    <label class="tool"><input type="radio" name="tool" value="move" id="toolMove"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacer</span></label>
+    <label class="tool"><input type="radio" name="tool" value="brush" id="toolBrush" checked><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c2.5 0 4.5-1 5-3.5l10-10-3-3-10 10C2.5 15 3 18 3 21zM14 5l5 5"/></svg><span>Pinceau</span></label>
+    <label class="tool"><input type="radio" name="tool" value="rect" id="toolRect"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span>Rectangle</span></label>
+    <label class="tool"><input type="radio" name="tool" value="erase" id="toolErase"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span></label>
+    <button class="tool" id="undo" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg><span>Retour</span></button>
+  </div>
+
+  <nav class="dock" aria-label="Actions principales">
+    <button class="btn" id="btnOpts" type="button">Réglages</button>
+    <button class="btn" id="btnCopy" type="button">Copier</button>
+    <button class="btn primary" id="btnShare" type="button">Partager</button>
+  </nav>
+
+  <input type="file" id="inCam" accept="image/*" capture="environment" hidden>
+  <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
+
+  <!-- Réglages : tout le reste, rangé ici -->
+  <div class="backdrop" id="backdrop" hidden></div>
+  <section class="sheet" id="sheet" hidden aria-label="Réglages">
+    <div class="sheet-head">
+      <h3>Réglages</h3>
+      <button class="btn small" id="closeSheet" type="button">Fermer</button>
+    </div>
+
+    <div class="group" id="termsPanel">
+      <h4>Ce que Kerckhoffs doit masquer</h4>
       <label for="tNames">Noms et prénoms</label>
       <input type="text" id="tNames" autocomplete="off" placeholder="Ex. Jean Exemple, Marie Exemple">
       <label for="tAddr">Adresses</label>
@@ -75,55 +105,26 @@
       <input type="text" id="tOther" autocomplete="off" placeholder="Employeur, n° de dossier, nom du cabinet…">
       <p class="hint">Séparez par des virgules. Les numéros AVS, IBAN, téléphones, e-mails et longs numéros sont trouvés tout seuls.</p>
     </div>
-  </details>
 
-  <!-- Éditeur -->
-  <div class="viewport" id="viewport">
-    <canvas id="cv" width="10" height="10"></canvas>
-    <p class="toast" id="toast" role="status" hidden></p>
-    <button class="fit" id="fit" type="button" hidden>Ajuster</button>
-    <div class="empty" id="empty">
-      <p>Prenez une photo ou importez un document pour commencer.</p>
+    <div class="group">
+      <button class="btn" id="detect" type="button">Détecter automatiquement</button>
+      <label class="brush" for="brush">Épaisseur du pinceau
+        <input type="range" id="brush" min="2" max="14" value="6">
+      </label>
     </div>
-  </div>
 
-  <div class="pages" id="pages" hidden></div>
-
-  <div class="tools">
-    <div class="seg" role="radiogroup" aria-label="Outil">
-      <label><input type="radio" name="tool" value="move" id="toolMove"> Déplacer</label>
-      <label><input type="radio" name="tool" value="brush" id="toolBrush" checked> Pinceau</label>
-      <label><input type="radio" name="tool" value="rect" id="toolRect"> Rectangle</label>
-      <label><input type="radio" name="tool" value="erase" id="toolErase"> Gomme</label>
-    </div>
-    <label class="brush" id="brushWrap" for="brush">Épaisseur
-      <input type="range" id="brush" min="2" max="14" value="6">
-    </label>
-    <button class="btn" id="detect" type="button">Détecter</button>
-  </div>
-  <p class="hint tools-hint" id="toolsHint">Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.</p>
-  <p class="status" id="status" role="status"></p>
-
-  <!-- Export -->
-  <section class="panel export">
-    <div class="opts">
+    <div class="group">
+      <h4>Export</h4>
       <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
       <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
-    </div>
-    <div class="actions">
       <button class="btn" id="btnSave" type="button">Enregistrer sur l'appareil</button>
+      <button class="btn" id="btnFile" type="button">Importer une image ou un PDF</button>
+      <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées.</p>
     </div>
-    <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées. Vérifiez l'image avant de l'envoyer.</p>
+
+    <p class="status" id="status" role="status"></p>
+    <p class="legend" id="legend" hidden></p>
   </section>
-
-  <p class="legend" id="legend" hidden></p>
-
-  <!-- Barre fixe en bas de l'écran -->
-  <nav class="dock" aria-label="Actions principales">
-    <button class="btn" id="undo" type="button">↶ Retour</button>
-    <button class="btn" id="btnCopy" type="button">Copier</button>
-    <button class="btn primary" id="btnShare" type="button">Partager</button>
-  </nav>
 </main>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>

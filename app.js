@@ -53,13 +53,15 @@
   function openWork(mode) {
     S.mode = mode;
     wipe();
-    $("termsPanel").open = true;
     $("home").hidden = true;
     $("work").hidden = false;
     $("workTitle").textContent = mode === "quick" ? "Photo rapide" : "Dossier";
     $("termsPanel").hidden = mode === "quick";
     $("inFile").multiple = mode !== "quick";
-    $("btnFile").textContent = mode === "quick" ? "Importer une image" : "Importer";
+    $("btnFile").textContent = mode === "quick" ? "Importer une image" : "Importer une image ou un PDF";
+    $("emptyFile").textContent = $("btnFile").textContent;
+    closeSheet();
+    if (mode === "folder") setTimeout(() => { if (!S.pages.length) openSheet(); }, 50); // d'abord : ce qu'il faut masquer
     $("inFile").accept = mode === "quick" ? "image/*" : "application/pdf,image/*";
     buildFormats();
     updateUI();
@@ -105,10 +107,11 @@
     const has = S.pages.length > 0;
     $("empty").hidden = has;
     cv.hidden = !has;
-    ["detect", "btnShare", "btnCopy", "btnSave", "brush"].forEach((id) => { $(id).disabled = !has; });
+    ["detect", "btnShare", "btnCopy", "btnSave"].forEach((id) => { $(id).disabled = !has; });
     updateUndo();
     $("pageInfo").textContent = S.pages.length > 1 ? `page ${S.cur + 1} / ${S.pages.length}` : "";
-    $("btnCam").textContent = has && S.mode === "quick" ? "Nouvelle photo" : (has ? "Ajouter une photo" : "Prendre une photo");
+    $("btnCam").textContent = S.mode === "quick" ? "Photo" : "+ Page";
+    $("btnCam").hidden = !has;
     const pg = $("pages");
     pg.hidden = S.pages.length < 2;
     pg.textContent = "";
@@ -183,7 +186,7 @@
       }
     }
     if (!added.length) return;
-    if (!S.pages.length) $("termsPanel").open = false;
+    closeSheet();
     if (S.mode === "quick") { S.pages = [added[0]]; S.tokens = new Map(); S.counters = {}; S.cur = 0; }
     else { S.pages.push(...added); S.cur = S.pages.length - added.length; }
     changed();
@@ -194,7 +197,16 @@
   }
 
   $("btnCam").addEventListener("click", () => $("inCam").click());
+  $("emptyCam").addEventListener("click", () => { closeSheet(); $("inCam").click(); });
   $("btnFile").addEventListener("click", () => $("inFile").click());
+  $("emptyFile").addEventListener("click", () => $("inFile").click());
+
+  // Réglages : un panneau qui monte du bas de l'écran
+  function openSheet() { $("sheet").hidden = false; $("backdrop").hidden = false; }
+  function closeSheet() { $("sheet").hidden = true; $("backdrop").hidden = true; }
+  $("btnOpts").addEventListener("click", openSheet);
+  $("closeSheet").addEventListener("click", closeSheet);
+  $("backdrop").addEventListener("click", closeSheet);
   $("inCam").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
   $("inFile").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = ""; });
 
@@ -275,14 +287,13 @@
 
   document.querySelectorAll('input[name="tool"]').forEach((r) => r.addEventListener("change", () => {
     tool = r.value;
-    $("brushWrap").hidden = tool !== "brush";
     const hints = {
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
       rect: "Glissez en diagonale : toute la zone devient noire. Idéal pour une ligne de texte ou un visage.",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
-    $("toolsHint").textContent = hints[tool];
+    if (page()) setStatus(hints[tool]);
   }));
 
   function distSeg(px, py, a, b) {
@@ -786,7 +797,7 @@
     $("tAddr").value = "Rue du Lac 12, 1003 Lausanne";
     const p = demoPage();
     S.pages = [p]; S.cur = 0; changed();
-    $("termsPanel").open = false;
+    closeSheet();
     updateUI();
     requestAnimationFrame(() => { fitView(); render(); });
     detectPages([p]);

@@ -136,15 +136,40 @@ input[type=text]{
 .seg label:has(input:checked){background:var(--accent);color:var(--accent-ink)}
 .seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
 
-/* barre fixe en bas */
-#work{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
-.dock{
-  position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;gap:10px;
-  padding-top:10px;padding-bottom:max(10px,env(safe-area-inset-bottom,0px));
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
-  background:var(--paper);border-top:1px solid var(--line);
-}
-.dock .btn{flex:1;min-height:50px}
-@media (min-width:792px){.dock{left:50%;right:auto;width:760px;transform:translateX(-50%);padding-left:0;padding-right:0}}
 .fit{position:absolute;top:10px;right:10px;z-index:3;min-height:40px;padding:6px 14px;border-radius:999px;border:0;
   background:rgba(255,255,255,.92);color:#14202b;font:600 .88rem var(--ui);cursor:pointer}
+
+/* ---- éditeur plein écran, sans défilement ---- */
+.editor{
+  height:100vh;height:100dvh;max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px;overflow:hidden;
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));
+  padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px));
+}
+.editor .bar{position:static;padding-block:0}
+.btn.small{min-height:40px;padding:6px 14px;font-size:.9rem}
+.btn.ghost{background:transparent;color:#e7edf0;border-color:rgba(255,255,255,.35)}
+.editor .viewport{flex:1 1 auto;height:auto;min-height:0}
+.empty-inner{display:grid;gap:12px;width:min(100%,280px)}
+.toolbar{display:flex;gap:4px;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tool{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;border-radius:9px;
+  font:600 .72rem var(--ui);color:var(--ink);background:none;border:0;cursor:pointer;padding:4px 2px}
+.tool input{position:absolute;opacity:0;pointer-events:none}
+.tool:has(input:checked){background:var(--accent);color:var(--accent-ink)}
+.tool:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
+.tool:disabled{opacity:.4;cursor:not-allowed}
+#undo{border-left:1px solid var(--line);border-radius:0 9px 9px 0}
+.dock{display:flex;gap:8px}
+.dock .btn{flex:1;min-height:50px}
+.backdrop{position:fixed;inset:0;z-index:20;background:rgba(10,14,17,.45)}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:82vh;max-height:82dvh;overflow-y:auto;overscroll-behavior:contain;
+  background:var(--sheet);border-top:1px solid var(--line);border-radius:16px 16px 0 0;display:grid;gap:14px;
+  padding-top:14px;padding-bottom:max(18px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+@media (min-width:792px){.sheet{left:50%;right:auto;width:760px;transform:translateX(-50%)}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between}
+.sheet h3{margin:0;font-size:1.1rem}
+.group{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.group h4{margin:0;font-size:.95rem}
+.group label{font-size:.85rem;font-weight:600}
