@@ -51,7 +51,7 @@
 
   // Lit les fichiers d'une copie gardée sur l'appareil (le cache du mode avion).
   async function verifierCopie(nomCache) {
-    if (!window.caches) return { ok: false, raison: "Aucune copie sur l'appareil." };
+    if (!window.caches || !(await caches.has(nomCache))) return { ok: false, absente: true, raison: "Aucune copie sur l'appareil." };
     const c = await caches.open(nomCache);
     return verifier(async (f) => {
       const r = await c.match(new URL(f, document.baseURI).href, { ignoreSearch: true });

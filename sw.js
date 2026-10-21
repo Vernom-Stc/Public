@@ -7,7 +7,7 @@
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.5.1";
+const VERSION = "kerckhoffs-v0.5.2";
 const FILES = [
   "./",
   "index.html",
@@ -45,7 +45,11 @@ const FILES = [
 const DEMANDE = "kerckhoffs-demande";
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
-    if (self.registration.active) { // ce n'est pas la première installation
+    // Seule exception : quitter une version d'essai d'avant cette règle (0.5.0 ou plus ancienne), qui n'a pas de bouton pour demander.
+    const num = (k) => k.replace("kerckhoffs-v", "").split(".").map(Number);
+    const essai = (await caches.keys()).filter((k) => /^kerckhoffs-v[0-9.]+$/.test(k) && k !== VERSION)
+      .every((k) => { const [a, b, c] = num(k); return a === 0 && (b < 5 || (b === 5 && (c || 0) === 0)); });
+    if (self.registration.active && !essai) { // une version est en place : on ne la remplace que sur demande
       const url = new URL("demande", self.registration.scope).href;
       const c = await caches.open(DEMANDE), d = await c.match(url);
       await c.delete(url);

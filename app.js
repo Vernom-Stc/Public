@@ -1630,7 +1630,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.1";
+  const VERSION_APP = "0.5.2";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
@@ -1652,28 +1652,44 @@
   const CACHE_ACTUEL = "kerckhoffs-v" + VERSION_APP;
   function afficherEmpreinte(r) {
     const el = $("verEmpreinte");
-    if (!r) { el.textContent = "disponible une fois l'application gardée sur l'appareil"; el.className = "empreinte"; return; }
+    if (!r || r.absente) { el.textContent = "disponible une fois l'application gardée sur l'appareil : rouvrez-la dans un instant"; el.className = "empreinte"; return; }
     el.textContent = r.ok ? `${r.empreinte} · signée par l'auteur ✓` : `${r.empreinte ? r.empreinte + " · " : ""}NON signée : ${r.raison}`;
     el.className = "empreinte " + (r.ok ? "ok" : "ko");
   }
   const st = $("offlineState");
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-    let enAttente = null, activationDemandee = false;
+    let enAttente = null, activationDemandee = false, migration = false;
     const examiner = async (reg) => {
       const w = reg.waiting;
       if (!w || w === enAttente || !navigator.serviceWorker.controller) return;
       enAttente = w;
+      if (migration) return; // ancienne version d'essai en attente : on attend la version actuelle, demandée ci-dessous
       // La nouvelle version est déjà sur l'appareil, mise de côté. La version actuelle la vérifie avant tout.
-      const noms = (await caches.keys()).filter((k) => k.startsWith("kerckhoffs-") && k !== CACHE_ACTUEL);
+      // Les vieilles copies (versions égales ou plus anciennes que la vôtre) sont effacées : seule une version plus récente peut être examinée.
+      const num = (k) => k.replace("kerckhoffs-v", "").split(".").map(Number);
+      const plusRecente = (x, y) => { for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+      const noms = [];
+      for (const k of (await caches.keys()).filter((k) => k.startsWith("kerckhoffs-v") && k !== CACHE_ACTUEL)) {
+        if (plusRecente(num(k), num(CACHE_ACTUEL))) noms.push(k); else await caches.delete(k);
+      }
       let r = { ok: false, raison: "Ses fichiers sont introuvables." };
       for (const n of noms) { r = await V.verifierCopie(n); if (r.ok) break; }
       montrerBandeau(r, w);
     };
-    navigator.serviceWorker.register("sw.js").then((reg) => {
+    navigator.serviceWorker.register("sw.js").then(async (reg) => {
+      // Passage unique depuis les versions d'essai d'avant les signatures : elles se mettaient à jour toutes seules,
+      // si bien que cette page est déjà plus récente que la copie gardée sur l'appareil. On demande alors la version actuelle,
+      // qui sera vérifiée et proposée comme d'habitude.
+      if (navigator.serviceWorker.controller && !(await caches.has(CACHE_ACTUEL))) {
+        migration = true;
+        const c = await caches.open("kerckhoffs-demande");
+        await c.put(new URL("demande", document.baseURI).href, new Response(String(Date.now())));
+        reg.update().catch(() => {});
+      }
       examiner(reg);
       reg.addEventListener("updatefound", () => {
         const w = reg.installing;
-        if (w) w.addEventListener("statechange", () => { if (w.state === "installed") examiner(reg); });
+        if (w) w.addEventListener("statechange", () => { if (w.state === "installed") { migration = false; examiner(reg); } });
       });
       // Regarder s'il y a une nouvelle version à l'ouverture, et à chaque retour dans l'application.
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
