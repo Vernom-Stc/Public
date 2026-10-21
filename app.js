@@ -95,7 +95,7 @@
 
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
-    S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true;
+    S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true; $("zonesChip").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
     profilSnapshot = "";
     history.length = 0;
@@ -732,13 +732,17 @@
     afterEdit(); majZones();
     const autres = S.pages.filter((q) => q !== p);
     if (autres.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
-    setStatus("Zone retenue : Kerckhoffs regardera au même endroit sur les autres pages et les prochaines photos.");
+    setStatus("Zone retenue pour ce document : Kerckhoffs regarde au même endroit sur les autres pages et les prochaines photos.");
   });
   function majZones() {
     $("zonesInfo").textContent = S.zones.length
       ? `${S.zones.length} zone${S.zones.length > 1 ? "s" : ""} répétée${S.zones.length > 1 ? "s" : ""} sur chaque page.` : "";
     $("zonesClear").hidden = !S.zones.length;
+    $("zonesChip").hidden = !S.zones.length;
+    $("zonesChip").textContent = `↺ ${S.zones.length} zone${S.zones.length > 1 ? "s" : ""} répétée${S.zones.length > 1 ? "s" : ""} · Effacer`;
   }
+  $("zonesChip").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("zonesChip").addEventListener("click", () => $("zonesClear").click());
   $("zonesClear").addEventListener("click", () => {
     S.zones = []; majZones();
     if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
@@ -1176,7 +1180,7 @@
       noms: liste("tNames"), adresses: liste("tAddr"), autres: liste("tOther"),
       formes: S.extra.filter((r) => r.forme).map((r) => r.forme),
       numeros: S.extra.filter((r) => r.numero).map((r) => r.numero),
-      zones: S.zones.map((z) => [z.x, z.y, z.w, z.h].map((v) => Math.round(v * 1000) / 1000)),
+      zones: [], // les zones répétées ne servent que pour le document en cours : elles ne sont jamais gardées
       dates: S.extra.some((r) => r.id === "sel-date"),
     };
   }
@@ -1206,8 +1210,7 @@
     o.formes.forEach((f) => { if (!S.extra.some((r) => r.forme === f)) S.extra.push(formeVersRegle(f)); });
     if (o.dates && !S.extra.some((r) => r.id === "sel-date")) S.extra.push({ id: "sel-date", type: "DATE", re: DATE_RE() });
     o.numeros.forEach((n) => { if (!S.extra.some((r) => r.numero === n)) S.extra.push(numeroVersRegle(n)); });
-    o.zones.forEach(([x, y, w, h]) => { if (!S.zones.some((z) => z.x === x && z.y === y && z.w === w && z.h === h)) S.zones.push({ x, y, w, h }); });
-    majZones();
+    // Les zones d'anciens profils sont ignorées : une zone ne vaut que pour le document où elle a été tracée.
     profilSnapshot = JSON.stringify(profilActuel());
     if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
     majProfilStatut();
@@ -1242,7 +1245,6 @@
     const parts = [`${n} mot${n > 1 ? "s" : ""} ou nom${n > 1 ? "s" : ""}`];
     if (o.formes.length) parts.push(`${o.formes.length} forme${o.formes.length > 1 ? "s" : ""} de numéro`);
     if (o.numeros.length) parts.push(`${o.numeros.length} numéro${o.numeros.length > 1 ? "s" : ""}`);
-    if (o.zones.length) parts.push(`${o.zones.length} zone${o.zones.length > 1 ? "s" : ""} répétée${o.zones.length > 1 ? "s" : ""}`);
     if (o.dates) parts.push("toutes les dates");
     return parts.join(", ");
   };
@@ -1630,7 +1632,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.2";
+  const VERSION_APP = "0.5.3";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

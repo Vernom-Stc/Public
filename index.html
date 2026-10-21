@@ -51,8 +51,8 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.5.2.html" download>Version figée, pour les usages sensibles</a></p>
-  <p class="fineprint">Version 0.5.2 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.5.3.html" download>Version figée, pour les usages sensibles</a></p>
+  <p class="fineprint">Version 0.5.3 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -71,6 +71,7 @@
     <div class="tampon" id="tampon" hidden aria-hidden="true"></div>
     <p class="toast" id="toast" role="status" hidden></p>
     <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <button class="zones-chip" id="zonesChip" type="button" hidden></button>
     <button class="btn primary crop-screen" id="cropScreen" type="button" hidden>Garder ce qui est à l'écran</button>
     <div class="selbar" id="cropbar" hidden>
       <button class="btn small primary" id="cropOk" type="button">Recadrer ici</button>
@@ -144,7 +145,7 @@
       <button class="btn" id="pfOpen" type="button">Ouvrir un profil (image du QR code)</button>
       <input type="file" id="inProfil" accept="image/*" hidden>
       <p class="hint" id="zonesInfo"></p>
-      <button class="btn" id="zonesClear" type="button" hidden>Oublier les zones répétées</button>
+      <button class="btn" id="zonesClear" type="button" hidden>Effacer les zones répétées</button>
       <p class="hint">Le profil garde vos noms et mots à masquer, jamais vos documents. Il est chiffré par votre phrase de passe : sans elle, l'image est illisible.</p>
     </div>
 
