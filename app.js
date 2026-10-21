@@ -203,13 +203,20 @@
     const v = S.view;
     cv.style.transform = `translate(${v.tx}px, ${v.ty}px) scale(${v.s})`;
   }
+  // Le bouton « Ajuster » apparaît dès que l'image n'est plus en vue entière.
+  function showFit() {
+    const v = S.view;
+    const atFit = Math.abs(v.s - v.fit) < 0.001 && Math.abs(v.tx - v.tx0) < 1 && Math.abs(v.ty - v.ty0) < 1;
+    $("fit").hidden = !page() || atFit;
+  }
   function fitView() {
     const p = page(); if (!p) return;
     cv.width = p.img.width; cv.height = p.img.height;
     const r = $("viewport").getBoundingClientRect();
     const s = Math.min(r.width / p.img.width, r.height / p.img.height);
     S.view = { s, tx: (r.width - p.img.width * s) / 2, ty: (r.height - p.img.height * s) / 2, fit: s };
-    applyView();
+    S.view.tx0 = S.view.tx; S.view.ty0 = S.view.ty;
+    applyView(); $("fit").hidden = true;
   }
 
   // Un élément dessiné : un trait de pinceau { kind:"line", w, pts } ou un rectangle { kind:"rect", x, y, w, h }.
@@ -270,6 +277,7 @@
     tool = r.value;
     $("brushWrap").hidden = tool !== "brush";
     const hints = {
+      move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
       rect: "Glissez en diagonale : toute la zone devient noire. Idéal pour une ligne de texte ou un visage.",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
@@ -317,7 +325,8 @@
     if (ptrs.size === 1) {
       downAt = [e.clientX, e.clientY]; moved = false;
       const pt = toImg(e.clientX, e.clientY);
-      if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
+      if (tool === "move") draft = { kind: "pan", pt, tx0: S.view.tx, ty0: S.view.ty };
+      else if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
       else if (tool === "rect") draft = { kind: "rect", x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
       else { draft = { kind: "erase" }; if (eraseAt(page(), pt[0], pt[1])) afterEdit(); }
     } else if (ptrs.size === 2) {
@@ -338,14 +347,18 @@
       const mid = [(a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top];
       const s = Math.min(S.view.fit * 12, Math.max(S.view.fit * 0.8, pinch.s0 * d / pinch.d0));
       S.view.s = s; S.view.tx = mid[0] - pinch.img[0] * s; S.view.ty = mid[1] - pinch.img[1] * s;
-      applyView();
+      applyView(); showFit();
       return;
     }
     if (!draft) return;
     if (!moved && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) moved = true;
     if (!moved) return;
     const pt = toImg(e.clientX, e.clientY);
-    if (draft.kind === "line") {
+    if (draft.kind === "pan") {
+      S.view.tx = draft.tx0 + (e.clientX - downAt[0]);
+      S.view.ty = draft.ty0 + (e.clientY - downAt[1]);
+      applyView(); showFit();
+    } else if (draft.kind === "line") {
       const last = draft.pts[draft.pts.length - 1];
       draft.pts.push(pt);
       strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] });
@@ -364,6 +377,10 @@
     const p = page(), d = draft;
     draft = null;
     if (d.kind === "erase") return;
+    if (d.kind === "pan") {
+      if (!moved) { const hit = hitBox(p, d.pt[0], d.pt[1]); if (hit) { toggleBox(p, hit); afterEdit(); } }
+      return;
+    }
     if (!moved || (d.kind === "rect" && (d.w < 4 || d.h < 4))) {
       // Un simple toucher sur une zone détectée la masque ou la démasque.
       const [x, y] = d.kind === "line" ? d.pts[0] : [d.x0, d.y0];
@@ -386,8 +403,10 @@
     const img = toImg(e.clientX, e.clientY);
     const s = Math.min(S.view.fit * 12, Math.max(S.view.fit * 0.8, S.view.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     S.view.s = s; S.view.tx = m[0] - img[0] * s; S.view.ty = m[1] - img[1] * s;
-    applyView();
+    applyView(); showFit();
   }, { passive: false });
+  $("fit").addEventListener("click", (e) => { e.stopPropagation(); fitView(); render(); });
+  $("fit").addEventListener("pointerdown", (e) => e.stopPropagation());
   window.addEventListener("resize", () => { if (page()) { fitView(); render(); } });
 
   // Retour : annule la dernière action (trait, rectangle, gomme, zone démasquée).

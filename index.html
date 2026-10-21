@@ -44,7 +44,7 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.2.7 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.2.8 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL ============ -->
@@ -81,6 +81,7 @@
   <div class="viewport" id="viewport">
     <canvas id="cv" width="10" height="10"></canvas>
     <p class="toast" id="toast" role="status" hidden></p>
+    <button class="fit" id="fit" type="button" hidden>Ajuster</button>
     <div class="empty" id="empty">
       <p>Prenez une photo ou importez un document pour commencer.</p>
     </div>
@@ -90,6 +91,7 @@
 
   <div class="tools">
     <div class="seg" role="radiogroup" aria-label="Outil">
+      <label><input type="radio" name="tool" value="move" id="toolMove"> Déplacer</label>
       <label><input type="radio" name="tool" value="brush" id="toolBrush" checked> Pinceau</label>
       <label><input type="radio" name="tool" value="rect" id="toolRect"> Rectangle</label>
       <label><input type="radio" name="tool" value="erase" id="toolErase"> Gomme</label>
