@@ -1691,12 +1691,19 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.7";
-  const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
+  const VERSION_APP = "0.5.8";
+  // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
+  // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
+  const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
+  const PAGE_VERSIONS = "https://github.com/Vernom-Stc/Public/blob/main/VERSIONS.md";
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
     $("verOrigine").textContent = location.host || "fichier local";
-    $("verOfficielle").textContent = ADRESSE_OFFICIELLE || "pas encore publiée (ceci est une version de test, non signée)";
+    $("verOfficielle").textContent = ADRESSE_OFFICIELLE.replace(/^https:\/\//, "").replace(/\/$/, "") + " (version de test)";
+    $("lienVersions").href = PAGE_VERSIONS;
+    $("adrVersions").textContent = PAGE_VERSIONS.replace(/^https:\/\//, "").replace(/\/blob\/.*/, "");
+    const qr = dessinerQR(PAGE_VERSIONS, "Liste officielle des versions");
+    if (qr) $("qrVersions").appendChild(qr);
     let vue = null;
     try { vue = localStorage.getItem("kerckhoffs-version-vue"); } catch (e) {}
     if (vue !== VERSION_APP) $("verif").hidden = false;

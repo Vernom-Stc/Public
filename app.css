@@ -253,3 +253,6 @@ input[type=password]{width:100%;font:16px var(--ui);color:var(--ink);background:
 .crop-screen{position:absolute;left:10px;top:10px;z-index:4;white-space:nowrap;box-shadow:0 0 0 3px rgba(255,255,255,.6)}
 .zones-chip{position:absolute;left:10px;bottom:10px;z-index:4;border:0;border-radius:999px;padding:8px 12px;
   background:#002366;color:#fff;font:inherit;font-size:.85rem;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.verif-lien{margin:14px 0;padding:12px;border:1px solid #c9d1cf;border-radius:12px;text-align:center}
+.verif-lien .btn{display:inline-block;text-decoration:none}
+.verif-qr canvas{width:170px;height:auto;margin:6px auto;display:block}

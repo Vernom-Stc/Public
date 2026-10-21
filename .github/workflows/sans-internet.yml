@@ -16,7 +16,9 @@ jobs:
           # Le code propre à Kerckhoffs ne doit contenir aucun appel réseau ni adresse externe.
           # sw.js est la seule exception autorisée : il lit les fichiers de Kerckhoffs lui-même.
           files="app.js verification.js rules/registre.js rules/commun.js rules/pays/*.js index.html"
-          if grep -nE "fetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|RTCPeerConnection|importScripts|https?://" $files; then
+          # Seule exception : les deux liens officiels de app.js, à ouvrir dans le navigateur (jamais une connexion de l'application).
+          autorises='^app.js:[0-9]+:  const (ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/"|PAGE_VERSIONS = "https://github.com/Vernom-Stc/Public/blob/main/VERSIONS.md");$'
+          if grep -nE "fetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|RTCPeerConnection|importScripts|https?://" $files | grep -vE "$autorises"; then
             echo "::error::Un accès réseau ou une adresse externe a été ajouté. Kerckhoffs ne doit jamais se connecter à internet."
             exit 1
           fi
