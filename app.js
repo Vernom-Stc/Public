@@ -277,8 +277,9 @@
         flux = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, ...VIDEO }, audio: false });
       }
     } catch (e) {
-      setStatus("La caméra n'est pas autorisée pour Kerckhoffs : l'appareil photo du téléphone va s'ouvrir, et il peut ranger la photo dans la galerie.");
-      $("inCam").click();
+      // Sans autorisation, l'appareil photo du téléphone ne s'ouvrirait pas non plus (il passe par le navigateur) : on propose ce qui marche.
+      setStatus("L'appareil photo n'est pas autorisé. Choisissez plutôt une photo déjà prise : « Importer une image ou un PDF ». " +
+        "Pour l'autoriser : Paramètres du téléphone → Applications → Chrome → Autorisations → Appareil photo.", true);
       return;
     }
     const v = $("camVideo");
@@ -1632,7 +1633,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.4";
+  const VERSION_APP = "0.5.5";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
