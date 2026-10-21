@@ -4,7 +4,7 @@
  * 2. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application.
  */
-const VERSION = "kerckhoffs-v0.2.0";
+const VERSION = "kerckhoffs-v0.2.1";
 const FILES = [
   "./",
   "index.html",
@@ -27,7 +27,12 @@ const FILES = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" : toujours prendre les fichiers frais du serveur, jamais une vieille copie du navigateur.
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -45,7 +50,18 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (e.request.method !== "GET") return;
+  // Les gros fichiers (moteur de lecture, bibliothèques) : copie locale d'abord.
+  if (url.pathname.includes("/vendor/")) {
+    e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));
+    return;
+  }
+  // L'application elle-même : la dernière version en ligne si possible, la copie locale en mode avion.
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request))
+    fetch(e.request, { cache: "no-cache" })
+      .then((res) => {
+        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); }
+        return res;
+      })
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });
