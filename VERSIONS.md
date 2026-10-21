@@ -6,11 +6,14 @@ Chaque version officielle est signée par l'auteur de Kerckhoffs. Cette liste es
 
 | Version | Date | Empreinte de l'application | Version figée (SHA-256 du fichier) |
 |---|---|---|---|
+| 0.5.1 | 2026-10-21 | `02A3-CA64-7FD8-9C84` | `03eef47846020b5bb31b87263548346a69b57aa5680d2e9b3b94b943e37571d0` |
 | 0.5.0 | 2026-10-21 | `E4DD-3257-23C3-06EB` | `192685a6c3ea41bb5a5f148d77dafb6a38f36c0ec45791b0356a0f2866859610` |
 
-## Ce que vous n'avez pas à faire
+## Aucune mise à jour toute seule
 
-Une fois votre version vérifiée, vous n'avez plus rien à faire : avant chaque mise à jour, l'application vérifie elle-même la signature de la nouvelle version, fichier par fichier. Si un seul octet a été changé par quelqu'un d'autre que l'auteur, la mise à jour est refusée et un bandeau rouge vous prévient.
+La version que vous avez vérifiée en l'installant reste exactement la même, avec ou sans internet, tant que vous ne l'effacez pas. Sans connexion, rien ne vous manque : votre version fonctionne entièrement.
+
+Si une nouvelle version existe, Kerckhoffs vous le signale, c'est tout. C'est vous qui allez la chercher, avec « Chercher une nouvelle version » sur l'accueil. Elle est alors téléchargée, vérifiée fichier par fichier, et ne remplace la vôtre que si vous touchez « Utiliser ». Si un seul octet a été changé par quelqu'un d'autre que l'auteur, elle est refusée et un bandeau rouge vous prévient.
 
 ## La version figée, pour les usages sensibles
 
@@ -38,4 +41,4 @@ L'empreinte de l'application est le début du SHA-256 de `empreintes.txt`, en qu
 
 # Kerckhoffs releases
 
-Every official release is signed by the author of Kerckhoffs. The table above is the reference: if the fingerprint shown in your app ("Vérifier ma version") differs from the one on this page at the official address, it is not an official release. Before every update, the installed app checks the new release's signature file by file and refuses it if anything differs. The frozen single-file version (`telecharger/`) never updates itself and is signed with the same Ed25519 key (`cle-publique.pem`). Verify with `node outils/verifier.mjs`, or with `sha256sum -c` and `openssl pkeyutl -verify` as shown above.
+Every official release is signed by the author of Kerckhoffs. The table above is the reference: if the fingerprint shown in your app ("Vérifier ma version") differs from the one on this page at the official address, it is not an official release. The app never updates itself: a new release is only announced, and is downloaded only when you ask for it. It is then checked file by file against the author's signature and refused if anything differs; it replaces yours only if you tap "Utiliser". The frozen single-file version (`telecharger/`) never updates itself and is signed with the same Ed25519 key (`cle-publique.pem`). Verify with `node outils/verifier.mjs`, or with `sha256sum -c` and `openssl pkeyutl -verify` as shown above.

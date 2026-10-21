@@ -31,7 +31,7 @@ Ce téléphone devient une machine fermée : aucun moyen physique d'envoyer quoi
 
 Touchez « Vérifier ma version » sur l'accueil. L'écran affiche une empreinte, par exemple `9A71-FC92-65A0-DC72`. Elle doit être identique à celle publiée pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
 
-Ensuite, c'est l'application qui veille : avant chaque mise à jour, votre version vérifie elle-même la signature de la nouvelle, fichier par fichier. Si quelqu'un d'autre que l'auteur a changé un seul octet, par exemple en prenant le contrôle du dépôt, la mise à jour est refusée et un bandeau rouge vous prévient.
+Cette version ne changera plus jamais toute seule, avec ou sans internet, tant que vous ne l'effacez pas. Si une nouvelle version existe, Kerckhoffs vous le signale ; c'est vous qui allez la chercher. Elle est alors vérifiée fichier par fichier avant de vous être proposée. Si quelqu'un d'autre que l'auteur a changé un seul octet, par exemple en prenant le contrôle du dépôt, la mise à jour est refusée et un bandeau rouge vous prévient.
 
 Une limite, dite franchement : sur le web, c'est le navigateur qui a le dernier mot sur les mises à jour. Pour les usages sensibles (avocats, médecins, administrations), utilisez donc la **version figée** : un seul fichier signé, à télécharger depuis l'accueil, qui s'ouvre d'un double-clic, fonctionne sans internet et ne se met jamais à jour tout seul.
 

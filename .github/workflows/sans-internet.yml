@@ -32,6 +32,7 @@ jobs:
         run: |
           grep -q "connect-src 'self'" index.html || { echo "::error::La règle connect-src 'self' a été retirée de index.html."; exit 1; }
           grep -q "url.origin !== self.location.origin" sw.js || { echo "::error::Le blocage des requêtes externes a été retiré de sw.js."; exit 1; }
+          grep -q "Mise à jour non demandée" sw.js || { echo "::error::sw.js doit refuser toute mise à jour que la personne n'est pas allée chercher."; exit 1; }
 
       - name: La version est signée par l'auteur
         run: node outils/verifier.mjs

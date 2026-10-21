@@ -31,7 +31,7 @@ That phone becomes a closed box: there is no physical way for it to send anythin
 
 Tap "Vérifier ma version" on the home screen. It shows a fingerprint such as `9A71-FC92-65A0-DC72`, which must match the one published for that release in [VERSIONS.md](VERSIONS.md) at the official address.
 
-After that, the app keeps watch: before every update, your installed version checks the new release's signature file by file. If anyone other than the author changed a single byte, for instance by taking over the repository, the update is refused and a red banner warns you.
+From then on, that version never changes by itself, online or offline, until you delete it. If a new release exists, Kerckhoffs only tells you; you go and get it yourself, and it is checked file by file before it is offered. If anyone other than the author changed a single byte, for instance by taking over the repository, the update is refused and a red banner warns you.
 
 One honest limit: on the web, the browser has the last word on updates. For sensitive use (lawyers, doctors, public services), use the **frozen version**: one signed file, downloadable from the home screen, that opens with a double-click, works offline and never updates itself.
 

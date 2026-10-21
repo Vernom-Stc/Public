@@ -1630,7 +1630,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.0";
+  const VERSION_APP = "0.5.1";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
@@ -1683,14 +1683,30 @@
       afficherEmpreinte(await V.verifierCopie(CACHE_ACTUEL));
     }).catch(() => { st.textContent = "Mode hors ligne indisponible sur ce navigateur"; afficherEmpreinte(null); });
     navigator.serviceWorker.addEventListener("controllerchange", () => { if (activationDemandee) location.reload(); });
-    $("majOk").addEventListener("click", () => {
-      if (!enAttente || !$("majBandeau").dataset.ok) return;
-      activationDemandee = true;
-      enAttente.postMessage("activer");
+    // Une version plus récente existe en ligne : on le dit, sans rien installer.
+    let dejaSignalee = null;
+    navigator.serviceWorker.addEventListener("message", (e) => {
+      if (!e.data || e.data.type !== "version-disponible" || e.data.version === dejaSignalee || enAttente) return;
+      dejaSignalee = e.data.version;
+      bandeau(`Une version ${e.data.version} existe. Rien n'a changé chez vous : vous gardez celle que vous avez vérifiée.`,
+        { action: "Aller la chercher", faire: chercherVersion });
     });
+    async function chercherVersion() {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return;
+      if (!navigator.onLine) { bandeau("Pas de connexion. Aucun souci : votre version continue de fonctionner, exactement comme avant."); return; }
+      bandeau("Recherche d'une nouvelle version…");
+      // Le feu vert, valable dix minutes : sans lui, aucune nouvelle version n'accepte de s'installer (voir sw.js).
+      const c = await caches.open("kerckhoffs-demande");
+      await c.put(new URL("demande", document.baseURI).href, new Response(String(Date.now())));
+      try { await reg.update(); } catch (e) { bandeau("Pas de connexion. Aucun souci : votre version continue de fonctionner, exactement comme avant."); return; }
+      if (!reg.installing && !reg.waiting) bandeau(`Vous avez déjà la dernière version (${VERSION_APP}).`);
+    }
+    $("chercherMaj").addEventListener("click", chercherVersion);
+    var activer = () => { if (!enAttente) return; activationDemandee = true; enAttente.postMessage("activer"); };
   } else if (FIGE) {
     st.textContent = "Version figée : sans internet, sans mise à jour"; st.classList.add("ready");
-    $("installBloc").hidden = true; $("lienFige").hidden = true;
+    $("installBloc").hidden = true; $("lienFige").hidden = true; $("chercherMaj").hidden = true;
     $("verOrigine").textContent = "ce fichier, sur votre appareil";
     $("verOfficielle").textContent = "aucune : cette version ne se connecte jamais";
     const el = $("verEmpreinte");
@@ -1700,21 +1716,30 @@
     st.textContent = "Ouvrez Kerckhoffs depuis son adresse web pour l'utiliser hors ligne";
     afficherEmpreinte(null);
   }
-  function montrerBandeau(r, w) {
-    const b = $("majBandeau"), e = $("majEmpreinte");
+  // Le bandeau du haut : une phrase, et au plus un bouton d'action.
+  let actionBandeau = null;
+  function bandeau(texte, o = {}) {
+    const b = $("majBandeau");
     b.hidden = false;
-    b.classList.toggle("danger", !r.ok);
-    b.dataset.ok = r.ok ? "1" : "";
-    $("majOk").hidden = !r.ok;
-    $("majPlusTard").textContent = r.ok ? "Plus tard" : "Compris";
-    e.hidden = !r.empreinte;
-    e.textContent = r.empreinte ? "Empreinte : " + r.empreinte : "";
+    b.classList.toggle("danger", !!o.danger);
+    $("majTexte").textContent = texte;
+    $("majEmpreinte").hidden = !o.empreinte;
+    $("majEmpreinte").textContent = o.empreinte ? "Empreinte : " + o.empreinte : "";
+    actionBandeau = o.faire || null;
+    $("majOk").hidden = !o.action;
+    $("majOk").textContent = o.action || "";
+    $("majPlusTard").textContent = o.action ? "Plus tard" : "Fermer";
+  }
+  $("majOk").addEventListener("click", () => { if (actionBandeau) actionBandeau(); });
+  function montrerBandeau(r) {
     if (r.ok) {
-      $("majTexte").textContent = `Nouvelle version ${r.version}, signée par l'auteur ✓` +
-        (S.pages.length ? " Terminez d'abord votre travail : l'utiliser efface l'ardoise." : "");
+      bandeau(`Version ${r.version} téléchargée et signée par l'auteur ✓ Elle ne remplacera la vôtre que si vous le décidez.` +
+        (S.pages.length ? " Terminez d'abord votre travail : l'utiliser efface l'ardoise." : ""),
+        { empreinte: r.empreinte, action: "Utiliser", faire: () => activer() });
     } else {
-      $("majTexte").textContent = "Attention : une nouvelle version NON signée par l'auteur est apparue. Elle a été bloquée. " +
-        "Ne rouvrez pas Kerckhoffs avant d'avoir vérifié l'adresse officielle : le navigateur pourrait l'installer à la prochaine ouverture. (" + r.raison + ")";
+      bandeau("Attention : la version trouvée n'est PAS signée par l'auteur. Elle est refusée : gardez la vôtre et ne rouvrez pas Kerckhoffs " +
+        "avant d'avoir vérifié l'adresse officielle, car le navigateur pourrait tout de même l'installer. (" + r.raison + ")",
+        { danger: true, empreinte: r.empreinte });
     }
   }
   $("majPlusTard").addEventListener("click", () => { $("majBandeau").hidden = true; });

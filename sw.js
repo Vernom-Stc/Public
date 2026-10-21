@@ -2,12 +2,12 @@
  * Kerckhoffs — service worker.
  * 1. Garde une copie de l'application sur l'appareil : elle fonctionne en mode avion,
  *    et c'est toujours cette copie, vérifiée, qui s'ouvre.
- * 2. Une nouvelle version est mise de côté sans être utilisée. L'application vérifie d'abord
- *    sa signature (verification.js) et ne l'active que si vous acceptez.
+ * 2. Jamais de mise à jour toute seule : une nouvelle version n'est que signalée. Elle ne s'installe que si
+ *    vous allez la chercher, puis l'application vérifie sa signature (verification.js) avant de vous la proposer.
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.5.0";
+const VERSION = "kerckhoffs-v0.5.1";
 const FILES = [
   "./",
   "index.html",
@@ -39,10 +39,29 @@ const FILES = [
   "vendor/tesseract/lang/fra.traineddata.gz",
 ];
 
+// Aucune mise à jour toute seule. Une nouvelle version ne s'installe que si la personne est allée la chercher
+// (bouton « Chercher une nouvelle version »), dans les dix dernières minutes. Sinon, elle est seulement signalée,
+// et rien n'est installé : la version en place reste exactement celle qui a été vérifiée.
+const DEMANDE = "kerckhoffs-demande";
 self.addEventListener("install", (e) => {
-  // cache: "reload" : toujours prendre les fichiers frais du serveur, jamais une vieille copie du navigateur.
-  // Pas d'activation automatique : la nouvelle version attend d'être vérifiée et acceptée.
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
+  e.waitUntil((async () => {
+    if (self.registration.active) { // ce n'est pas la première installation
+      const url = new URL("demande", self.registration.scope).href;
+      const c = await caches.open(DEMANDE), d = await c.match(url);
+      await c.delete(url);
+      const quand = d ? Number(await d.text()) : 0;
+      if (!(Date.now() - quand < 10 * 60 * 1000)) {
+        for (const client of await self.clients.matchAll({ includeUncontrolled: true })) {
+          client.postMessage({ type: "version-disponible", version: VERSION.replace("kerckhoffs-v", "") });
+        }
+        throw new Error("Mise à jour non demandée : rien n'est installé.");
+      }
+    }
+    // cache: "reload" : toujours prendre les fichiers frais du serveur, jamais une vieille copie du navigateur.
+    // Même demandée, la nouvelle version attend encore : elle est d'abord vérifiée, puis acceptée ou non.
+    const c = await caches.open(VERSION);
+    await c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })));
+  })());
 });
 
 self.addEventListener("message", (e) => {
