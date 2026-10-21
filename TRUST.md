@@ -47,7 +47,8 @@ Kerckhoffs stops once the redacted PDF is created. If you then send it to ChatGP
 
 - **Photos taken with Kerckhoffs's own camera** stay in its working memory and vanish when you close it. They never go through your gallery. If you refuse camera access, the phone's camera app opens instead, and it may save the photo to your gallery.
 - **Hidden metadata** in photos (GPS location, date, phone model) is removed from everything Kerckhoffs exports.
-- **Mobile app, coming later**: it will also block screenshots and hide its content in the list of open apps.
+- **Screenshots**: Kerckhoffs cannot prevent them. While you work, the image carries an "ORIGINAL · NOT REDACTED · DO NOT SEND" stamp, so any screenshot of the original shows it. Only the exported copy is clean.
+- **Kerckhoffs is on no app store.** One official address only: if you found it on the App Store or Google Play, it is a copy.
 - **Careful with imported documents**: if you import a photo or PDF already on your phone, the original stays where it was, and it may already be backed up to the cloud. For a sensitive document, photograph it directly from Kerckhoffs instead.
 
 Kerckhoffs does not control your phone itself. If you want a complete guarantee, use the offline old phone from Test 2.

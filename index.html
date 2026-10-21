@@ -45,7 +45,7 @@
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
   <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.4.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.4.1 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -61,6 +61,7 @@
 
   <div class="viewport" id="viewport">
     <canvas id="cv" width="10" height="10"></canvas>
+    <div class="tampon" id="tampon" hidden aria-hidden="true"></div>
     <p class="toast" id="toast" role="status" hidden></p>
     <button class="fit" id="fit" type="button" hidden>Ajuster</button>
     <div class="selbar" id="selbar" hidden>

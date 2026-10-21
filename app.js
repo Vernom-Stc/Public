@@ -134,6 +134,7 @@
   function updateUI() {
     const has = S.pages.length > 0;
     $("empty").hidden = has;
+    $("tampon").hidden = !has;
     cv.hidden = !has;
     ["detect", "btnShare", "btnCopy", "btnSave"].forEach((id) => { $(id).disabled = !has; });
     updateUndo();
@@ -1392,7 +1393,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.0";
+  const VERSION_APP = "0.4.1";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

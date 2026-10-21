@@ -47,7 +47,8 @@ Kerckhoffs s'arrête au moment où le PDF masqué est créé. Si vous l'envoyez 
 
 - **Les photos prises avec la caméra de Kerckhoffs** restent dans sa mémoire de travail et disparaissent à la fermeture. Elles ne passent jamais par la galerie. Si vous refusez l'accès à la caméra, c'est l'appareil photo du téléphone qui s'ouvre, et lui peut ranger la photo dans la galerie.
 - **Les métadonnées cachées** des photos (lieu GPS, date, modèle du téléphone) sont supprimées de tout ce que Kerckhoffs exporte.
-- **Application mobile, à venir** : elle bloquera aussi les captures d'écran et cachera son contenu dans la liste des applications ouvertes.
+- **Captures d'écran** : Kerckhoffs ne peut pas les empêcher. Pendant le travail, l'image porte donc un tampon « ORIGINAL · NON MASQUÉ · NE PAS ENVOYER » : une capture de l'original le montre toujours. Seule la photocopie exportée est propre.
+- **Kerckhoffs n'existe sur aucun store.** Une seule adresse officielle : si vous l'avez trouvé sur l'App Store ou Google Play, c'est une copie.
 - **Attention aux documents importés** : si vous importez une photo ou un PDF déjà présent sur votre téléphone, l'original reste là où il était, et il est peut-être déjà sauvegardé dans le cloud. Pour un document sensible, photographiez-le plutôt directement depuis Kerckhoffs.
 
 Kerckhoffs ne contrôle pas votre téléphone lui-même. Si vous voulez une garantie totale, utilisez le vieux téléphone sans connexion du test 2.
