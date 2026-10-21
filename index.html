@@ -36,6 +36,13 @@
     </button>
   </div>
 
+  <section class="install" id="installBloc">
+    <h2>Installez Kerckhoffs sur votre téléphone</h2>
+    <p>Ouvrez cette page dans votre navigateur (pas depuis une autre application), puis menu ⋮ → « Ajouter à l'écran d'accueil ». Ouvrez ensuite toujours Kerckhoffs par son icône : il se met à jour tout seul, et votre travail ne se perd pas quand vous passez d'une application à l'autre.</p>
+    <button class="btn primary" id="btnInstaller" type="button" hidden>Installer Kerckhoffs</button>
+    <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page.</p>
+  </section>
+
   <section class="offline">
     <p class="offline-state" id="offlineState">Préparation du mode hors ligne…</p>
     <p>Kerckhoffs ne se connecte jamais à internet. <strong>Faites le test : activez le mode avion</strong>, puis utilisez l'application normalement.</p>
@@ -45,7 +52,7 @@
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
   <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.4.4 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.4.5 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -188,6 +195,13 @@
     </div>
   </section>
 </main>
+
+<!-- Bandeau de mise à jour -->
+<div class="maj" id="majBandeau" hidden role="status">
+  <span id="majTexte">Nouvelle version disponible.</span>
+  <button class="btn small primary" id="majOk" type="button">Utiliser</button>
+  <button class="btn small" id="majPlusTard" type="button">Plus tard</button>
+</div>
 
 <!-- Profil : créer ou ouvrir le QR code -->
 <section class="overlay" id="profil" hidden aria-label="Mon profil">

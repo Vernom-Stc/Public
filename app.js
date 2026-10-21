@@ -1521,7 +1521,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.4";
+  const VERSION_APP = "0.4.5";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
@@ -1537,13 +1537,50 @@
     $("openVerif").addEventListener("click", () => { $("verif").hidden = false; });
   })();
 
-  /* ------------------------------------------------------ hors ligne */
+  /* ------------------------------------------------------ hors ligne et mises à jour */
   const st = $("offlineState");
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-    navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then(() => {
+    const avaitUneVersion = !!navigator.serviceWorker.controller;
+    let nouvelleVersion = false;
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      // Vérifier la page officielle à l'ouverture, et à chaque retour dans l'application.
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+      return navigator.serviceWorker.ready;
+    }).then(() => {
       st.textContent = "Prêt pour le mode avion"; st.classList.add("ready");
     }).catch(() => { st.textContent = "Mode hors ligne indisponible sur ce navigateur"; });
+    // Une nouvelle version vient de s'installer : on propose de l'utiliser, sans jamais effacer un travail en cours.
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!avaitUneVersion || nouvelleVersion) return;
+      nouvelleVersion = true;
+      montrerBandeau();
+    });
   } else {
     st.textContent = "Ouvrez Kerckhoffs depuis son adresse web pour l'utiliser hors ligne";
   }
+  function montrerBandeau() {
+    const b = $("majBandeau");
+    b.hidden = false;
+    $("majTexte").textContent = S.pages.length
+      ? "Nouvelle version disponible. Terminez d'abord votre travail : l'utiliser efface l'ardoise."
+      : "Nouvelle version disponible.";
+  }
+  $("majOk").addEventListener("click", () => location.reload());
+  $("majPlusTard").addEventListener("click", () => { $("majBandeau").hidden = true; });
+
+  /* ---------------------------------------- installer Kerckhoffs comme une application */
+  let invitation = null;
+  const installee = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (installee()) $("installBloc").hidden = true;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); invitation = e;
+    $("btnInstaller").hidden = false;
+  });
+  $("btnInstaller").addEventListener("click", async () => {
+    if (!invitation) return;
+    invitation.prompt();
+    try { await invitation.userChoice; } catch (e) {}
+    invitation = null; $("btnInstaller").hidden = true;
+  });
+  window.addEventListener("appinstalled", () => { $("installBloc").hidden = true; });
 })();
