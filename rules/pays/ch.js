@@ -4,8 +4,10 @@
  */
 (function () {
   // Numéro AVS : 756.XXXX.XXXX.XC, chiffre de contrôle EAN-13
+  // La lecture d'une photo confond parfois des chiffres et des lettres : O→0, l/I→1, S→5, B→8.
+  function chiffres(s) { return s.replace(/[Oo]/g, "0").replace(/[lI|]/g, "1").replace(/S/g, "5").replace(/B/g, "8").replace(/\D/g, ""); }
   function avsValide(s) {
-    var d = s.replace(/\D/g, "");
+    var d = chiffres(s);
     if (d.length !== 13) return false;
     var somme = 0;
     for (var i = 0; i < 12; i++) somme += (+d[i]) * (i % 2 ? 3 : 1);
@@ -38,9 +40,10 @@
         id: "avs",
         label: "Numéros AVS",
         type: "AVS",
-        re: /756[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{2}/g,
+        // Tolérant aux séparateurs (points, espaces, virgules) et aux erreurs de lecture courantes
+        re: /\b756(?:[\s.,·:-]{0,2}[0-9OoIlSB]){10}\b/g,
         check: avsValide,
-        exemples: { trouve: ["756.9217.0769.85"], ignore: [] }
+        exemples: { trouve: ["756.9217.0769.85", "756 9217 0769 85", "756.92l7.O769.85"], ignore: ["7561234"] }
       },
       {
         id: "iban",

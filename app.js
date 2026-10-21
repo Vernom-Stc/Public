@@ -458,10 +458,11 @@
     tool = r.value;
     if (S.sel) unselect();
     if (S.cadre) annulerCadre();
+    $("cropScreen").hidden = tool !== "crop" || !page();
     const hints = {
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
-      crop: "Glissez en diagonale autour de la feuille : tout ce qui est autour (table, autres papiers) sera coupé.",
+      crop: "Zoomez et déplacez avec deux doigts pour ne voir que la feuille, puis touchez « Garder ce qui est à l'écran ». Ou glissez en diagonale autour de la feuille.",
       rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, ou masquer tous les pareils (par exemple toutes les dates).",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
@@ -578,7 +579,7 @@
     if (d.kind === "crop") {
       if (d.w < 20 || d.h < 20) { render(); return; }
       S.cadre = { page: p, rect: { x: d.x, y: d.y, w: d.w, h: d.h } };
-      $("cropbar").hidden = false; render();
+      $("cropbar").hidden = false; $("cropScreen").hidden = true; render();
       return;
     }
     if (d.kind === "rect") { select(p, { x: d.x, y: d.y, w: d.w, h: d.h }); return; }
@@ -628,7 +629,20 @@
     ctx.strokeRect(r.x, r.y, r.w, r.h);
     ctx.restore();
   }
-  function annulerCadre() { S.cadre = null; $("cropbar").hidden = true; render(); }
+  function annulerCadre() { S.cadre = null; $("cropbar").hidden = true; $("cropScreen").hidden = tool !== "crop" || !page(); render(); }
+  // Ce qui est visible dans le cadre de l'écran, en coordonnées de l'image
+  function zoneVisible() {
+    const p = page(), r = $("viewport").getBoundingClientRect(), v = S.view;
+    const x0 = Math.max(0, -v.tx / v.s), y0 = Math.max(0, -v.ty / v.s);
+    const x1 = Math.min(p.img.width, (r.width - v.tx) / v.s), y1 = Math.min(p.img.height, (r.height - v.ty) / v.s);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  $("cropScreen").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("cropScreen").addEventListener("click", () => {
+    if (!page()) return;
+    S.cadre = { page: page(), rect: zoneVisible() };
+    $("cropOk").click();
+  });
   $("cropCancel").addEventListener("click", annulerCadre);
   $("cropbar").addEventListener("pointerdown", (e) => e.stopPropagation());
   $("cropOk").addEventListener("click", () => {
@@ -646,6 +660,7 @@
     history.push({ type: "crop", page: p, avant });
     S.cadre = null; $("cropbar").hidden = true;
     fitView(); changed(); render();
+    $("cropScreen").hidden = tool !== "crop";
     detectPages([p]);
   });
 
@@ -751,10 +766,31 @@
     return out;
   }
 
+  // Copie nettoyée pour la lecture : niveaux de gris et contraste renforcé, même taille que l'image.
+  // Une photo prise sur une table se lit ainsi beaucoup mieux.
+  function pourLecture(src) {
+    const c = document.createElement("canvas");
+    c.width = src.width; c.height = src.height;
+    const x = c.getContext("2d");
+    x.drawImage(src, 0, 0);
+    const im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0; d[i] = g; hist[g]++; }
+    const total = d.length / 4;
+    let lo = 0, hi = 255, acc = 0;
+    while (lo < 255 && (acc += hist[lo]) < total * 0.01) lo++;
+    acc = 0;
+    while (hi > 0 && (acc += hist[hi]) < total * 0.05) hi--;
+    const span = Math.max(1, hi - lo);
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)); d[i] = d[i + 1] = d[i + 2] = v; }
+    x.putImageData(im, 0, 0);
+    return c;
+  }
+
   async function ocr(p) {
     if (p.lines) return;
     const w = await getWorker();
-    const { data } = await w.recognize(p.img);
+    const { data } = await w.recognize(pourLecture(p.img));
     p.lines = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: x.bbox, conf: x.confidence })) }));
   }
 
@@ -1521,7 +1557,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.5";
+  const VERSION_APP = "0.4.6";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
