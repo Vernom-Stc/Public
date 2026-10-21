@@ -50,9 +50,12 @@
     version: 0,         // change à chaque modification
     cache: null,        // { key, out } dernier export préparé
     extra: [],          // motifs ajoutés par « Masquer tous les pareils » (pour cette session)
+    zones: [],          // zones répétées sur chaque page, en proportions de la page : { x, y, w, h } entre 0 et 1
     sel: null,          // zone sélectionnée au rectangle : { page, rect }
     leaving: false,
   };
+  // Pour les tests sur l'ordinateur du développeur uniquement (jamais sur l'adresse publique).
+  if (location.hostname === "localhost") window.__kerckhoffsTest = S;
   const cv = $("cv");
   const ctx = cv.getContext("2d");
   const page = () => S.pages[S.cur];
@@ -90,7 +93,7 @@
 
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
-    S.extra = []; S.sel = null; $("selbar").hidden = true;
+    S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
     profilSnapshot = "";
     history.length = 0;
@@ -463,7 +466,7 @@
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
       crop: "Zoomez et déplacez avec deux doigts pour ne voir que la feuille, puis touchez « Garder ce qui est à l'écran ». Ou glissez en diagonale autour de la feuille.",
-      rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, ou masquer tous les pareils (par exemple toutes les dates).",
+      rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, masquer tous les pareils (par exemple toutes les dates), ou la répéter au même endroit sur chaque page.",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
     if (page()) setStatus(hints[tool]);
@@ -675,6 +678,12 @@
     return { id: "forme-" + forme, type: "MOTIF", re, forme };
   }
 
+  // Le même numéro, quels que soient les espaces, points ou tirets : « 12345678 » trouve aussi « 12 345 678 ».
+  function numeroVersRegle(chiffres) {
+    const re = new RegExp("(?<![0-9])" + chiffres.split("").join("[\\s.\\-/]{0,2}") + "(?![0-9])", "g");
+    return { id: "numero-" + chiffres, type: "MOTIF", re, numero: chiffres };
+  }
+
   function select(p, rect) {
     S.sel = { page: p, rect };
     $("selbar").hidden = false;
@@ -692,11 +701,15 @@
   function motifDe(texte) {
     const t = texte.trim();
     const d = DATE_RE();
-    if (d.test(t)) return { kind: "regle", sg: "date", pl: "dates", fem: true, regle: { id: "sel-date", type: "DATE", re: DATE_RE() } };
+    if (d.test(t)) return { kind: "regle", sg: "date", pl: "dates", fem: true, regles: [{ id: "sel-date", type: "DATE", re: DATE_RE() }] };
     if (/\d/.test(t)) {
       // Forme simple et lisible : chaque chiffre devient 9 (« 2026-4471 » donne « 9999-9999 »).
       const forme = t.replace(/\d/g, "9").replace(/\s+/g, " ");
-      if (FORME_OK.test(forme)) return { kind: "regle", sg: "élément de même forme", pl: "éléments de même forme", fem: false, regle: formeVersRegle(forme) };
+      const regles = [];
+      if (FORME_OK.test(forme)) regles.push(formeVersRegle(forme));
+      const chiffres = t.replace(/\D/g, "");
+      if (chiffres.length >= 4 && chiffres.length <= 24) regles.push(numeroVersRegle(chiffres)); // le même numéro, écrit autrement
+      if (regles.length) return { kind: "regle", sg: "élément semblable", pl: "éléments semblables", fem: false, regles };
     }
     return { kind: "terme", sg: "occurrence", pl: "occurrences", fem: true, terme: t };
   }
@@ -708,6 +721,26 @@
     afterEdit();
   });
   $("selCancel").addEventListener("click", unselect);
+  $("selZone").addEventListener("click", () => {
+    if (!S.sel) return;
+    const { page: p, rect: r } = S.sel, W = p.img.width, H = p.img.height;
+    maskRect(p, r); // ici : masqué tout de suite
+    S.zones.push({ x: r.x / W, y: r.y / H, w: r.w / W, h: r.h / H });
+    S.sel = null; $("selbar").hidden = true;
+    afterEdit(); majZones();
+    const autres = S.pages.filter((q) => q !== p);
+    if (autres.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
+    setStatus("Zone retenue : Kerckhoffs regardera au même endroit sur les autres pages et les prochaines photos.");
+  });
+  function majZones() {
+    $("zonesInfo").textContent = S.zones.length
+      ? `${S.zones.length} zone${S.zones.length > 1 ? "s" : ""} répétée${S.zones.length > 1 ? "s" : ""} sur chaque page.` : "";
+    $("zonesClear").hidden = !S.zones.length;
+  }
+  $("zonesClear").addEventListener("click", () => {
+    S.zones = []; majZones();
+    if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
+  });
   $("selbar").addEventListener("pointerdown", (e) => e.stopPropagation()); // les boutons ne dessinent pas
   $("selAll").addEventListener("click", async () => {
     if (!S.sel || busy) return;
@@ -726,7 +759,7 @@
     const texte = dedans.join(" ").replace(/[,;:]+$/, "");
     const m = motifDe(texte);
     let type;
-    if (m.kind === "regle") { S.extra.push(m.regle); type = m.regle.type; }
+    if (m.kind === "regle") { m.regles.forEach((r) => { if (!S.extra.some((x) => x.id === r.id)) S.extra.push(r); }); type = m.regles[0].type; }
     else {
       const champ = $("tOther");
       champ.value = champ.value.trim() ? champ.value.trim() + ", " + m.terme : m.terme;
@@ -754,6 +787,10 @@
           if (m.status === "recognizing text") setStatus(`Lecture du texte… ${Math.round(m.progress * 100)} %`, true);
           else if (m.status && m.progress < 1) setStatus("Préparation du moteur de lecture…", true);
         },
+      }).then(async (w) => {
+        // Mode « texte épars » : lit chaque bloc séparément, mieux adapté aux formulaires et aux colonnes.
+        try { await w.setParameters({ tessedit_pageseg_mode: "11", preserve_interword_spaces: "1" }); } catch (e) {}
+        return w;
       }).catch((e) => { workerP = null; throw e; });
     }
     return workerP;
@@ -768,11 +805,15 @@
 
   // Copie nettoyée pour la lecture : niveaux de gris et contraste renforcé, même taille que l'image.
   // Une photo prise sur une table se lit ainsi beaucoup mieux.
+  // La copie est agrandie jusqu'à ~2500 pixels de large (l'équivalent d'un scan à 300 dpi), où la lecture est la plus fiable.
   function pourLecture(src) {
+    const k = Math.max(1, Math.min(2, 2500 / Math.max(src.width, 1)));
     const c = document.createElement("canvas");
-    c.width = src.width; c.height = src.height;
+    c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
     const x = c.getContext("2d");
-    x.drawImage(src, 0, 0);
+    x.imageSmoothingQuality = "high";
+    x.drawImage(src, 0, 0, c.width, c.height);
+    c.facteur = k;
     const im = x.getImageData(0, 0, c.width, c.height), d = im.data;
     const hist = new Uint32Array(256);
     for (let i = 0; i < d.length; i += 4) { const g = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0; d[i] = g; hist[g]++; }
@@ -790,8 +831,11 @@
   async function ocr(p) {
     if (p.lines) return;
     const w = await getWorker();
-    const { data } = await w.recognize(pourLecture(p.img));
-    p.lines = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: x.bbox, conf: x.confidence })) }));
+    const copie = pourLecture(p.img), k = copie.facteur;
+    const { data } = await w.recognize(copie);
+    // Les positions lues sur la copie agrandie sont ramenées à l'échelle de l'image.
+    const ramener = (b) => ({ x0: b.x0 / k, y0: b.y0 / k, x1: b.x1 / k, y1: b.y1 / k });
+    p.lines = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: ramener(x.bbox), conf: x.confidence })) }));
   }
 
   const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -858,6 +902,15 @@
           if (bad && r.silent) continue; // faux positif connu : on ignore
           take(rr, m.index, m.index + m[0].length, r.type, v, r.type + "|" + v.replace(/[\s.]/g, "").toLowerCase(), bad ? "à relire" : null);
         }
+      }
+      // Zones répétées : si du texte se trouve au même endroit que sur une page précédente, il est masqué.
+      for (const z of S.zones) {
+        const W = p.img.width, H = p.img.height, mx = 0.02 * W, my = 0.02 * H;
+        words.forEach((w, i) => {
+          const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
+          if (cx >= z.x * W - mx && cx <= (z.x + z.w) * W + mx && cy >= z.y * H - my && cy <= (z.y + z.h) * H + my)
+            take(rr, rr[i][0], rr[i][1], "ZONE", w.text, "ZONE|" + norm(w.text));
+        });
       }
       // Valeurs qui suivent une étiquette de formulaire (« Nom : », « Né le »…), voir rules/etiquettes.js
       for (const v of K.valeursApresEtiquettes(raw)) {
@@ -1112,22 +1165,27 @@
       v: 1,
       noms: liste("tNames"), adresses: liste("tAddr"), autres: liste("tOther"),
       formes: S.extra.filter((r) => r.forme).map((r) => r.forme),
+      numeros: S.extra.filter((r) => r.numero).map((r) => r.numero),
+      zones: S.zones.map((z) => [z.x, z.y, z.w, z.h].map((v) => Math.round(v * 1000) / 1000)),
       dates: S.extra.some((r) => r.id === "sel-date"),
     };
   }
-  const profilVide = (p) => !p.noms.length && !p.adresses.length && !p.autres.length && !p.formes.length && !p.dates;
+  const profilVide = (p) => !p.noms.length && !p.adresses.length && !p.autres.length && !p.formes.length && !p.numeros.length && !p.zones.length && !p.dates;
   const profilModifie = () => { const p = profilActuel(); return !profilVide(p) && JSON.stringify(p) !== profilSnapshot; };
 
   // Contrôle strict : tout ce qui ne correspond pas exactement au format attendu est refusé.
   const FORME_OK = /^[A-Za-zÀ-ÿ0-9 .\-\/:'’]{2,40}$/;
   function validerProfil(o) {
     if (!o || typeof o !== "object" || Array.isArray(o) || o.v !== 1) return null;
-    const cles = ["v", "noms", "adresses", "autres", "formes", "dates"];
+    const cles = ["v", "noms", "adresses", "autres", "formes", "numeros", "zones", "dates"];
+    o.numeros = o.numeros || []; o.zones = o.zones || []; // profils plus anciens
     if (Object.keys(o).some((k) => !cles.includes(k))) return null;
     const mots = (a) => Array.isArray(a) && a.length <= LIMITES.mots &&
       a.every((s) => typeof s === "string" && s.length >= 1 && s.length <= LIMITES.longueur && !/[\u0000-\u001f<>]/.test(s));
     if (!mots(o.noms) || !mots(o.adresses) || !mots(o.autres)) return null;
     if (!Array.isArray(o.formes) || o.formes.length > LIMITES.formes || !o.formes.every((f) => typeof f === "string" && FORME_OK.test(f))) return null;
+    if (!Array.isArray(o.numeros) || o.numeros.length > LIMITES.formes || !o.numeros.every((n) => typeof n === "string" && /^\d{4,24}$/.test(n))) return null;
+    if (!Array.isArray(o.zones) || o.zones.length > 20 || !o.zones.every((z) => Array.isArray(z) && z.length === 4 && z.every((v) => typeof v === "number" && v >= 0 && v <= 1))) return null;
     if (typeof o.dates !== "boolean") return null;
     return o;
   }
@@ -1137,6 +1195,9 @@
     fusion("tNames", o.noms); fusion("tAddr", o.adresses); fusion("tOther", o.autres);
     o.formes.forEach((f) => { if (!S.extra.some((r) => r.forme === f)) S.extra.push(formeVersRegle(f)); });
     if (o.dates && !S.extra.some((r) => r.id === "sel-date")) S.extra.push({ id: "sel-date", type: "DATE", re: DATE_RE() });
+    o.numeros.forEach((n) => { if (!S.extra.some((r) => r.numero === n)) S.extra.push(numeroVersRegle(n)); });
+    o.zones.forEach(([x, y, w, h]) => { if (!S.zones.some((z) => z.x === x && z.y === y && z.w === w && z.h === h)) S.zones.push({ x, y, w, h }); });
+    majZones();
     profilSnapshot = JSON.stringify(profilActuel());
     if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
     majProfilStatut();
@@ -1170,6 +1231,8 @@
     const n = o.noms.length + o.adresses.length + o.autres.length;
     const parts = [`${n} mot${n > 1 ? "s" : ""} ou nom${n > 1 ? "s" : ""}`];
     if (o.formes.length) parts.push(`${o.formes.length} forme${o.formes.length > 1 ? "s" : ""} de numéro`);
+    if (o.numeros.length) parts.push(`${o.numeros.length} numéro${o.numeros.length > 1 ? "s" : ""}`);
+    if (o.zones.length) parts.push(`${o.zones.length} zone${o.zones.length > 1 ? "s" : ""} répétée${o.zones.length > 1 ? "s" : ""}`);
     if (o.dates) parts.push("toutes les dates");
     return parts.join(", ");
   };
@@ -1557,7 +1620,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.7";
+  const VERSION_APP = "0.4.8";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

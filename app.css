@@ -176,7 +176,7 @@ input[type=text],select{
 .selbar{position:absolute;left:10px;right:10px;top:10px;z-index:4;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .selbar .btn{flex:1 1 auto}
 .btn.dark{background:#000;border-color:#000;color:#fff}
-.selbar{flex-wrap:nowrap}
+.selbar{flex-wrap:wrap}
 .selbar #selCancel,.selbar #cropCancel{flex:0 0 auto;min-width:44px}
 .selbar .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
