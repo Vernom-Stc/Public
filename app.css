@@ -216,3 +216,10 @@ input[type=text],select{
 .verif-list dt{font-weight:600;color:var(--muted);font-size:.88rem}
 .verif-list dd{margin:0;font-family:var(--mono);font-size:.9rem;overflow-wrap:anywhere}
 .strict-note{color:var(--warn)}
+
+/* profil */
+.overlay-inner > div{display:grid;gap:10px}
+.overlay label{font-weight:600;font-size:.88rem}
+input[type=password]{width:100%;font:16px var(--ui);color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:10px}
+.pf-image{width:100%;max-width:420px;justify-self:center;border:1px solid var(--line);border-radius:8px;background:#fff}
+.pf-erreur{color:var(--warn);font-weight:600;min-height:1em}

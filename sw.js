@@ -4,7 +4,7 @@
  * 2. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application.
  */
-const VERSION = "kerckhoffs-v0.3.6";
+const VERSION = "kerckhoffs-v0.4.0";
 const FILES = [
   "./",
   "index.html",
@@ -23,6 +23,8 @@ const FILES = [
   "vendor/pdfjs/pdf.worker.min.js",
   "vendor/jspdf/jspdf.umd.min.js",
   "vendor/tesseract/tesseract.min.js",
+  "vendor/qrcode/qrcode.js",
+  "vendor/jsqr/jsQR.js",
   "vendor/tesseract/worker.min.js",
   "vendor/tesseract/core/tesseract-core-lstm.wasm.js",
   "vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js",

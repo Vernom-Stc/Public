@@ -45,7 +45,7 @@
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
   <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.3.6 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.4.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -117,6 +117,15 @@
       <p class="hint">Les règles de chaque pays sont dans le code, dossier rules/pays/. Chacun peut ajouter le sien.</p>
     </div>
 
+    <div class="group">
+      <h4>Mon profil</h4>
+      <p class="hint" id="pfStatut">Aucun mot enregistré pour l'instant.</p>
+      <button class="btn" id="pfSave" type="button">Enregistrer mon profil (QR code)</button>
+      <button class="btn" id="pfOpen" type="button">Ouvrir un profil (image du QR code)</button>
+      <input type="file" id="inProfil" accept="image/*" hidden>
+      <p class="hint">Le profil garde vos noms et mots à masquer, jamais vos documents. Il est chiffré par votre phrase de passe : sans elle, l'image est illisible.</p>
+    </div>
+
     <div class="group" id="termsPanel">
       <h4>Ce que Kerckhoffs doit masquer</h4>
       <label for="tNames">Noms et prénoms</label>
@@ -169,6 +178,54 @@
   </section>
 </main>
 
+<!-- Profil : créer ou ouvrir le QR code -->
+<section class="overlay" id="profil" hidden aria-label="Mon profil">
+  <div class="overlay-inner">
+    <div id="pfVueCreer" hidden>
+      <h3>Enregistrer mon profil</h3>
+      <p>Kerckhoffs va fabriquer un QR code chiffré avec vos noms et mots à masquer. Gardez l'image : la prochaine fois, importez-la pour retrouver vos réglages.</p>
+      <label for="pfPass">Phrase de passe</label>
+      <input type="password" id="pfPass" autocomplete="new-password" placeholder="Par exemple quatre mots au hasard">
+      <label for="pfPass2">Répétez la phrase de passe</label>
+      <input type="password" id="pfPass2" autocomplete="new-password">
+      <p class="hint">Au moins 12 caractères. Sans elle, personne ne peut lire le profil, pas même vous : notez-la en lieu sûr.</p>
+      <div class="cerbere-foot"><button class="btn pfFermer" type="button">Annuler</button><button class="btn primary" id="pfCreer" type="button">Créer le QR code</button></div>
+    </div>
+    <div id="pfVueQR" hidden>
+      <h3>Votre QR code de profil</h3>
+      <img id="pfImage" class="pf-image" alt="QR code chiffré du profil Kerckhoffs">
+      <p id="pfInfo"></p>
+      <div class="cerbere-foot"><button class="btn" id="pfPartager" type="button">Partager</button><button class="btn primary" id="pfEnregistrer" type="button">Enregistrer l'image</button></div>
+      <button class="btn pfFermer" type="button">Fermer</button>
+    </div>
+    <div id="pfVueOuvrir" hidden>
+      <h3>Profil Kerckhoffs trouvé</h3>
+      <p>Cette image contient un profil chiffré. Entrez sa phrase de passe pour l'ouvrir.</p>
+      <label for="pfPassOuvrir">Phrase de passe</label>
+      <input type="password" id="pfPassOuvrir" autocomplete="current-password">
+      <div class="cerbere-foot"><button class="btn pfFermer" type="button">Annuler</button><button class="btn primary" id="pfDechiffrer" type="button">Ouvrir</button></div>
+    </div>
+    <div id="pfVueResume" hidden>
+      <h3>Utiliser ce profil ?</h3>
+      <p id="pfResume"></p>
+      <p class="hint">Comparez l'empreinte avec celle écrite sous le QR code, ou avec celle de votre collègue.</p>
+      <div class="cerbere-foot"><button class="btn pfFermer" type="button">Annuler</button><button class="btn primary" id="pfUtiliser" type="button">Utiliser ce profil</button></div>
+    </div>
+    <p class="pf-erreur" id="pfErreur" role="alert"></p>
+  </div>
+</section>
+
+<!-- Fin de session -->
+<section class="overlay" id="finSession" hidden aria-label="Fin de session">
+  <div class="overlay-inner">
+    <h3>Garder les mots de cette session ?</h3>
+    <p>Vous avez ajouté des noms ou des mots à masquer. Kerckhoffs va tout effacer en revenant à l'accueil. Pour les retrouver la prochaine fois, enregistrez-les dans un QR code de profil.</p>
+    <button class="btn primary" id="finGarder" type="button">Enregistrer mon profil</button>
+    <button class="btn" id="finEffacer" type="button">Non, tout effacer</button>
+    <button class="btn" id="finRester" type="button">Continuer à travailler</button>
+  </div>
+</section>
+
 <!-- Aperçu final (mode strict) -->
 <section class="overlay" id="apercu" hidden aria-label="Aperçu final">
   <div class="overlay-inner">
@@ -201,6 +258,8 @@
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script src="vendor/jspdf/jspdf.umd.min.js"></script>
 <script src="vendor/tesseract/tesseract.min.js"></script>
+<script src="vendor/qrcode/qrcode.js"></script>
+<script src="vendor/jsqr/jsQR.js"></script>
 <script src="rules/registre.js"></script>
 <script src="rules/commun.js"></script>
 <script src="rules/cerbere.js"></script>

@@ -91,6 +91,7 @@
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
     S.extra = []; S.sel = null; $("selbar").hidden = true;
+    profilSnapshot = "";
     history.length = 0;
     ["tNames", "tAddr", "tOther"].forEach((id) => { $(id).value = ""; });
     $("optMask").checked = true;
@@ -98,7 +99,13 @@
     changed();
   }
 
+  function quitter() {
+    wipe(); fermerCamera();
+    $("work").hidden = true;
+    $("home").hidden = false;
+  }
   $("back").addEventListener("click", () => {
+    if (profilModifie()) { $("finSession").hidden = false; return; } // garder les mots appris ?
     if (S.pages.length && !S.leaving) {
       S.leaving = true;
       setStatus("Touchez encore « Accueil » pour tout effacer et revenir.");
@@ -199,7 +206,9 @@
           pdf.destroy();
         } else {
           const im = await loadImage(f);
-          added.push(newPage(toCanvas(im, im.width, im.height), f.name || "photo"));
+          const c = toCanvas(im, im.width, im.height);
+          if (await estUnProfil(c)) continue; // c'est un QR code de profil, pas une page
+          added.push(newPage(c, f.name || "photo"));
           if (im.close) im.close();
         }
       } catch (e) {
@@ -252,7 +261,7 @@
     if (!v.videoWidth) return;
     const c = toCanvas(v, v.videoWidth, v.videoHeight); // l'image est copiée sur l'ardoise, rien n'est écrit sur le téléphone
     fermerCamera();
-    addPages([newPage(c, "photo")]);
+    estUnProfil(c).then((profil) => { if (!profil) addPages([newPage(c, "photo")]); });
   });
   $("camCancel").addEventListener("click", fermerCamera);
   $("btnCam").addEventListener("click", ouvrirCamera);
@@ -528,6 +537,13 @@
   const MOIS = "janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre";
   const DATE_RE = () => new RegExp(`(?:\\b\\d{1,2}[./-]\\d{1,2}[./-](?:\\d{4}|\\d{2})\\b|(?:\\b\\d{1,2}(?:er)?\\s+)?(?:${MOIS})\\s+\\d{4}\\b)`, "gi");
 
+  // Transforme une forme (« 9999-9999 ») en règle de détection. Seuls des caractères simples sont acceptés.
+  function formeVersRegle(forme) {
+    const corps = [...forme].map((ch) => (ch === "9" ? "\\d" : ch === " " ? "\\s?" : ch.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&"))).join("");
+    const re = new RegExp((/^[A-Za-z0-9]/.test(forme) ? "\\b" : "") + corps + (/[A-Za-z0-9]$/.test(forme) ? "\\b" : ""), "gi");
+    return { id: "forme-" + forme, type: "MOTIF", re, forme };
+  }
+
   function select(p, rect) {
     S.sel = { page: p, rect };
     $("selbar").hidden = false;
@@ -547,9 +563,9 @@
     const d = DATE_RE();
     if (d.test(t)) return { kind: "regle", sg: "date", pl: "dates", fem: true, regle: { id: "sel-date", type: "DATE", re: DATE_RE() } };
     if (/\d/.test(t)) {
-      const forme = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\d/g, "\\d").replace(/\s+/g, "\\s?");
-      const re = new RegExp((/^\w/.test(t) ? "\\b" : "") + forme + (/\w$/.test(t) ? "\\b" : ""), "gi");
-      return { kind: "regle", sg: "élément de même forme", pl: "éléments de même forme", fem: false, regle: { id: "sel-" + S.extra.length, type: "MOTIF", re } };
+      // Forme simple et lisible : chaque chiffre devient 9 (« 2026-4471 » donne « 9999-9999 »).
+      const forme = t.replace(/\d/g, "9").replace(/\s+/g, " ");
+      if (FORME_OK.test(forme)) return { kind: "regle", sg: "élément de même forme", pl: "éléments de même forme", fem: false, regle: formeVersRegle(forme) };
     }
     return { kind: "terme", sg: "occurrence", pl: "occurrences", fem: true, terme: t };
   }
@@ -929,6 +945,206 @@
   }
   $("btnCopy").addEventListener("click", () => avecCerbere(doCopy));
 
+  /* ------------------ profil : les mots appris, gardés dans un QR code chiffré que VOUS conservez */
+  // Le profil ne contient que des listes de mots et des formes simples (ex. « 99-999 »), jamais de code ni de document.
+  const PROFIL_PREFIXE = "KERCKHOFFS:1:";
+  const LIMITES = { mots: 150, longueur: 80, formes: 30 };
+  let profilSnapshot = "";       // contenu du profil au dernier enregistrement ou ouverture
+  let profilEnAttente = null;    // texte du QR code lu, en attente de la phrase de passe
+  let profilLu = null;           // profil déchiffré, en attente de confirmation
+
+  const liste = (id) => $(id).value.split(",").map((s) => s.trim()).filter(Boolean);
+  function profilActuel() {
+    return {
+      v: 1,
+      noms: liste("tNames"), adresses: liste("tAddr"), autres: liste("tOther"),
+      formes: S.extra.filter((r) => r.forme).map((r) => r.forme),
+      dates: S.extra.some((r) => r.id === "sel-date"),
+    };
+  }
+  const profilVide = (p) => !p.noms.length && !p.adresses.length && !p.autres.length && !p.formes.length && !p.dates;
+  const profilModifie = () => { const p = profilActuel(); return !profilVide(p) && JSON.stringify(p) !== profilSnapshot; };
+
+  // Contrôle strict : tout ce qui ne correspond pas exactement au format attendu est refusé.
+  const FORME_OK = /^[A-Za-zÀ-ÿ0-9 .\-\/:'’]{2,40}$/;
+  function validerProfil(o) {
+    if (!o || typeof o !== "object" || Array.isArray(o) || o.v !== 1) return null;
+    const cles = ["v", "noms", "adresses", "autres", "formes", "dates"];
+    if (Object.keys(o).some((k) => !cles.includes(k))) return null;
+    const mots = (a) => Array.isArray(a) && a.length <= LIMITES.mots &&
+      a.every((s) => typeof s === "string" && s.length >= 1 && s.length <= LIMITES.longueur && !/[\u0000-\u001f<>]/.test(s));
+    if (!mots(o.noms) || !mots(o.adresses) || !mots(o.autres)) return null;
+    if (!Array.isArray(o.formes) || o.formes.length > LIMITES.formes || !o.formes.every((f) => typeof f === "string" && FORME_OK.test(f))) return null;
+    if (typeof o.dates !== "boolean") return null;
+    return o;
+  }
+
+  function appliquerProfil(o) {
+    const fusion = (id, a) => { const v = liste(id); a.forEach((x) => { if (!v.includes(x)) v.push(x); }); $(id).value = v.join(", "); };
+    fusion("tNames", o.noms); fusion("tAddr", o.adresses); fusion("tOther", o.autres);
+    o.formes.forEach((f) => { if (!S.extra.some((r) => r.forme === f)) S.extra.push(formeVersRegle(f)); });
+    if (o.dates && !S.extra.some((r) => r.id === "sel-date")) S.extra.push({ id: "sel-date", type: "DATE", re: DATE_RE() });
+    profilSnapshot = JSON.stringify(profilActuel());
+    if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
+    majProfilStatut();
+  }
+
+  // Chiffrement : PBKDF2 (310 000 tours) + AES-GCM 256. Toute modification du QR code est détectée et refusée.
+  const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  async function cle(pass, sel) {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt: sel, iterations: 310000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function chiffrerProfil(o, pass) {
+    const sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await cle(pass, sel), new TextEncoder().encode(JSON.stringify(o))));
+    const tout = new Uint8Array(sel.length + iv.length + ct.length);
+    tout.set(sel); tout.set(iv, 16); tout.set(ct, 28);
+    return PROFIL_PREFIXE + b64u(tout);
+  }
+  async function dechiffrerProfil(texte, pass) {
+    const d = unb64u(texte.slice(PROFIL_PREFIXE.length));
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: d.slice(16, 28) }, await cle(pass, d.slice(0, 16)), d.slice(28));
+    return validerProfil(JSON.parse(new TextDecoder().decode(pt)));
+  }
+  async function empreinte(o) {
+    const h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(o))));
+    const x = [...h.slice(0, 3)].map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    return x.slice(0, 2) + "-" + x.slice(2);
+  }
+  const resume = (o) => {
+    const n = o.noms.length + o.adresses.length + o.autres.length;
+    const parts = [`${n} mot${n > 1 ? "s" : ""} ou nom${n > 1 ? "s" : ""}`];
+    if (o.formes.length) parts.push(`${o.formes.length} forme${o.formes.length > 1 ? "s" : ""} de numéro`);
+    if (o.dates) parts.push("toutes les dates");
+    return parts.join(", ");
+  };
+
+  // Dessin du QR code, avec une légende sans aucune donnée personnelle.
+  function dessinerQR(texte, legende) {
+    let qr = null;
+    for (const niveau of ["M", "L"]) {
+      try { qr = qrcode(0, niveau); qr.addData(texte, "Byte"); qr.make(); break; } catch (e) { qr = null; }
+    }
+    if (!qr) return null;
+    const n = qr.getModuleCount(), cell = Math.max(4, Math.floor(720 / (n + 8))), marge = cell * 4, bas = 70;
+    const c = document.createElement("canvas");
+    c.width = n * cell + marge * 2; c.height = n * cell + marge * 2 + bas;
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = "#000";
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) x.fillRect(marge + k * cell, marge + r * cell, cell, cell);
+    x.fillStyle = "#002366"; x.font = "600 24px system-ui, sans-serif"; x.textAlign = "center";
+    x.fillText(legende, c.width / 2, c.height - bas / 2);
+    return c;
+  }
+
+  // Lecture d'un QR code sur une image : lecteur intégré du téléphone si possible, sinon jsQR (hors ligne).
+  async function lireQR(c) {
+    if ("BarcodeDetector" in window) {
+      try {
+        const r = await new BarcodeDetector({ formats: ["qr_code"] }).detect(c);
+        if (r.length) return r[0].rawValue;
+      } catch (e) {}
+    }
+    try {
+      const k = Math.min(1, 1400 / Math.max(c.width, c.height));
+      const t = document.createElement("canvas");
+      t.width = Math.round(c.width * k); t.height = Math.round(c.height * k);
+      const x = t.getContext("2d"); x.drawImage(c, 0, 0, t.width, t.height);
+      const r = jsQR(x.getImageData(0, 0, t.width, t.height).data, t.width, t.height);
+      return r ? r.data : null;
+    } catch (e) { return null; }
+  }
+  // Si l'image est un profil Kerckhoffs, on propose de l'ouvrir au lieu de l'ajouter comme page.
+  async function estUnProfil(c) {
+    const t = await lireQR(c);
+    if (t && t.startsWith(PROFIL_PREFIXE)) { demanderOuverture(t); return true; }
+    return false;
+  }
+
+  function vue(nom) {
+    ["pfVueCreer", "pfVueQR", "pfVueOuvrir", "pfVueResume"].forEach((id) => { $(id).hidden = id !== nom; });
+    $("pfErreur").textContent = "";
+    $("profil").hidden = false;
+  }
+  function majProfilStatut() {
+    const p = profilActuel();
+    $("pfStatut").textContent = profilVide(p) ? "Aucun mot enregistré pour l'instant." : `Profil en cours : ${resume(p)}.`;
+  }
+
+  $("pfSave").addEventListener("click", () => {
+    if (profilVide(profilActuel())) { setStatus("Rien à enregistrer : ajoutez d'abord des noms ou des mots à masquer."); return; }
+    closeSheet(); $("pfPass").value = ""; $("pfPass2").value = ""; vue("pfVueCreer");
+  });
+  $("pfCreer").addEventListener("click", async () => {
+    const pass = $("pfPass").value;
+    if (pass.length < 12) { $("pfErreur").textContent = "Choisissez une phrase de passe d'au moins 12 caractères, par exemple quatre mots au hasard."; return; }
+    if (pass !== $("pfPass2").value) { $("pfErreur").textContent = "Les deux phrases de passe ne sont pas identiques."; return; }
+    const o = profilActuel();
+    const texte = await chiffrerProfil(o, pass);
+    const emp = await empreinte(o);
+    const d = new Date(), z = (n) => String(n).padStart(2, "0");
+    const c = dessinerQR(texte, `Profil Kerckhoffs · ${emp} · ${z(d.getDate())}.${z(d.getMonth() + 1)}.${d.getFullYear()}`);
+    if (!c) { $("pfErreur").textContent = "Le profil est trop grand pour un QR code. Retirez quelques mots."; return; }
+    profilSnapshot = JSON.stringify(o);
+    $("pfImage").src = c.toDataURL("image/png");
+    $("pfInfo").textContent = `Empreinte ${emp} · ${resume(o)}. Enregistrez cette image : elle est illisible sans votre phrase de passe.`;
+    $("pfImage").dataset.nom = `kerckhoffs-profil-${emp}.png`;
+    S.qrCanvas = c;
+    vue("pfVueQR");
+  });
+  $("pfEnregistrer").addEventListener("click", async () => {
+    const b = await blobOf(S.qrCanvas, "image/png");
+    save({ files: [new File([b], $("pfImage").dataset.nom, { type: "image/png" })] });
+    $("pfInfo").textContent = "QR code enregistré. Rangez aussi votre phrase de passe en lieu sûr.";
+  });
+  $("pfPartager").addEventListener("click", async () => {
+    const b = await blobOf(S.qrCanvas, "image/png");
+    const f = new File([b], $("pfImage").dataset.nom, { type: "image/png" });
+    try { await navigator.share({ files: [f] }); } catch (e) { if (e.name !== "AbortError") save({ files: [f] }); }
+  });
+
+  $("pfOpen").addEventListener("click", () => $("inProfil").click());
+  $("inProfil").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    closeSheet();
+    try {
+      const im = await loadImage(f);
+      if (!(await estUnProfil(toCanvas(im, im.width, im.height)))) setStatus("Aucun QR code de profil Kerckhoffs trouvé sur cette image.");
+    } catch (err) { setStatus("Impossible de lire cette image."); }
+  });
+  function demanderOuverture(texte) {
+    profilEnAttente = texte; $("pfPassOuvrir").value = ""; vue("pfVueOuvrir");
+  }
+  $("pfDechiffrer").addEventListener("click", async () => {
+    try {
+      const o = await dechiffrerProfil(profilEnAttente, $("pfPassOuvrir").value);
+      if (!o) throw new Error("format");
+      profilLu = o;
+      $("pfResume").textContent = `Ce profil contient ${resume(o)}. Empreinte : ${await empreinte(o)}.`;
+      vue("pfVueResume");
+    } catch (err) {
+      $("pfErreur").textContent = "Impossible d'ouvrir ce profil : phrase de passe incorrecte, ou QR code modifié.";
+    }
+  });
+  $("pfUtiliser").addEventListener("click", () => {
+    if (profilLu) appliquerProfil(profilLu);
+    profilLu = null; profilEnAttente = null;
+    $("profil").hidden = true;
+    setStatus("Profil chargé : ses mots seront masqués sur tous vos documents.");
+  });
+  document.querySelectorAll(".pfFermer").forEach((b) => b.addEventListener("click", () => {
+    $("profil").hidden = true; profilLu = null; profilEnAttente = null;
+  }));
+
+  // Fin de session : proposer de garder les mots appris
+  $("finGarder").addEventListener("click", () => { $("finSession").hidden = true; $("pfPass").value = ""; $("pfPass2").value = ""; vue("pfVueCreer"); });
+  $("finEffacer").addEventListener("click", () => { $("finSession").hidden = true; quitter(); });
+  $("finRester").addEventListener("click", () => { $("finSession").hidden = true; });
+
   /* --------------------------- Cerbère : vérifier ce qui reste visible, avant d'envoyer */
   // Tout se passe ici, sur l'appareil. Les règles et la liste des mots sensibles sont dans rules/cerbere.js.
   let cerbereOk = -1;        // version du document déjà vérifiée par Cerbère
@@ -1176,7 +1392,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.3.6";
+  const VERSION_APP = "0.4.0";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
