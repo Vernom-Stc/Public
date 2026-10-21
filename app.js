@@ -105,7 +105,7 @@
       setTimeout(() => { S.leaving = false; }, 4000);
       return;
     }
-    wipe();
+    wipe(); fermerCamera();
     $("work").hidden = true;
     $("home").hidden = false;
   });
@@ -206,6 +206,10 @@
         setStatus(`Impossible de lire « ${f.name} ». Essayez une photo ou un PDF.`);
       }
     }
+    addPages(added);
+  }
+
+  function addPages(added) {
     if (!added.length) return;
     closeSheet();
     if (S.mode === "quick") { S.pages = [added[0]]; S.tokens = new Map(); S.counters = {}; S.cur = 0; }
@@ -217,8 +221,42 @@
     detectPages(added); // la détection démarre toute seule, dans les deux modes
   }
 
-  $("btnCam").addEventListener("click", () => $("inCam").click());
-  $("emptyCam").addEventListener("click", () => { closeSheet(); $("inCam").click(); });
+  /* ------------- caméra intégrée : la photo reste sur l'ardoise, jamais dans la galerie */
+  let flux = null;
+  async function ouvrirCamera() {
+    closeSheet();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("inCam").click(); return; }
+    try {
+      flux = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } },
+        audio: false,
+      });
+    } catch (e) {
+      setStatus("La caméra n'est pas autorisée pour Kerckhoffs : l'appareil photo du téléphone va s'ouvrir, et il peut ranger la photo dans la galerie.");
+      $("inCam").click();
+      return;
+    }
+    const v = $("camVideo");
+    v.srcObject = flux;
+    $("camView").hidden = false;
+    try { await v.play(); } catch (e) {}
+  }
+  function fermerCamera() {
+    if (flux) flux.getTracks().forEach((t) => t.stop());
+    flux = null;
+    $("camVideo").srcObject = null;
+    $("camView").hidden = true;
+  }
+  $("camShot").addEventListener("click", () => {
+    const v = $("camVideo");
+    if (!v.videoWidth) return;
+    const c = toCanvas(v, v.videoWidth, v.videoHeight); // l'image est copiée sur l'ardoise, rien n'est écrit sur le téléphone
+    fermerCamera();
+    addPages([newPage(c, "photo")]);
+  });
+  $("camCancel").addEventListener("click", fermerCamera);
+  $("btnCam").addEventListener("click", ouvrirCamera);
+  $("emptyCam").addEventListener("click", ouvrirCamera);
   $("btnFile").addEventListener("click", () => $("inFile").click());
   $("emptyFile").addEventListener("click", () => $("inFile").click());
 

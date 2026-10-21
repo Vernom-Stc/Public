@@ -45,7 +45,7 @@ Kerckhoffs s'arrête au moment où le PDF masqué est créé. Si vous l'envoyez 
 
 **Le seul fichier que Kerckhoffs écrit sur votre téléphone, c'est le PDF déjà masqué.** Même s'il partait un jour sur internet, il ne contiendrait pas vos données.
 
-- **Les photos prises avec le bouton « Prendre une photo »** restent dans la mémoire de Kerckhoffs et disparaissent à la fermeture. Sur iPhone, elles ne sont pas enregistrées dans la galerie. Sur Android, cela dépend de l'appareil photo du téléphone : vérifiez-le une fois dans votre galerie.
+- **Les photos prises avec la caméra de Kerckhoffs** restent dans sa mémoire de travail et disparaissent à la fermeture. Elles ne passent jamais par la galerie. Si vous refusez l'accès à la caméra, c'est l'appareil photo du téléphone qui s'ouvre, et lui peut ranger la photo dans la galerie.
 - **Les métadonnées cachées** des photos (lieu GPS, date, modèle du téléphone) sont supprimées de tout ce que Kerckhoffs exporte.
 - **Application mobile, à venir** : elle bloquera aussi les captures d'écran et cachera son contenu dans la liste des applications ouvertes.
 - **Attention aux documents importés** : si vous importez une photo ou un PDF déjà présent sur votre téléphone, l'original reste là où il était, et il est peut-être déjà sauvegardé dans le cloud. Pour un document sensible, photographiez-le plutôt directement depuis Kerckhoffs.

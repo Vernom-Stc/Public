@@ -45,7 +45,7 @@ Kerckhoffs stops once the redacted PDF is created. If you then send it to ChatGP
 
 **The only file Kerckhoffs ever writes on your phone is the PDF that is already redacted.** Even if it ended up online one day, it would not contain your data.
 
-- **Photos taken with the "Take a photo" button** stay in Kerckhoffs's memory and vanish when you close it. On iPhone, they are not saved to your gallery. On Android, it depends on the phone's camera app: check your gallery once.
+- **Photos taken with Kerckhoffs's own camera** stay in its working memory and vanish when you close it. They never go through your gallery. If you refuse camera access, the phone's camera app opens instead, and it may save the photo to your gallery.
 - **Hidden metadata** in photos (GPS location, date, phone model) is removed from everything Kerckhoffs exports.
 - **Mobile app, coming later**: it will also block screenshots and hide its content in the list of open apps.
 - **Careful with imported documents**: if you import a photo or PDF already on your phone, the original stays where it was, and it may already be backed up to the cloud. For a sensitive document, photograph it directly from Kerckhoffs instead.
