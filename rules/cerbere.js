@@ -29,6 +29,15 @@ Kerckhoffs.ajouterCerbere({
       re: /\b[A-ZÀ-ÖØ-Ý]{3,}(?:[- ][A-ZÀ-ÖØ-Ý]{3,}){1,2}\b/g,
       exemples: { trouve: ["JEAN EXEMPLE"], ignore: ["CH-1211", "Jean Exemple"] }
     }
+,
+    {
+      // Code de référence mêlant lettres et chiffres (numéro de document, de dossier…), ex. « AKQ278MXN »
+      id: "reference",
+      label: "Référence possible (lettres et chiffres)",
+      type: "REFERENCE",
+      re: /\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{7,14}\b/g,
+      exemples: { trouve: ["AKQ278MXN"], ignore: ["ICC", "2023", "MONTFALCON"] }
+    }
   ],
   sensibles: [
     { mot: "AI", exact: true }, { mot: "invalidité" }, { mot: "maladie" }, { mot: "malade" },

@@ -62,6 +62,14 @@
         exemples: { trouve: ["Rue des Epinettes 20", "Chemin de la Gravière 4"], ignore: ["Total CHF 19.60"] }
       },
       {
+        // Numéro avant la rue, comme souvent à Genève et en France : « 12 rue Louis-De-Montfalcon »
+        id: "rue-numero-avant",
+        label: "Adresses (numéro puis rue)",
+        type: "ADRESSE",
+        re: /\b\d{1,4}(?:[a-zA-Z]|\s(?:bis|ter))?,?\s+(?:rue|route|rte|avenue|av\.|chemin|ch\.|boulevard|bd|place|pl\.|quai|impasse|allée|allee|sentier|ruelle|promenade|passage|clos|esplanade|square)\s+(?:[A-Za-zÀ-ÿ'’.-]+\s?){1,4}/gi,
+        exemples: { trouve: ["12 rue Louis-De-Montfalcon", "3 bis avenue de la Gare"], ignore: ["12 mois"] }
+      },
+      {
         // Version alémanique
         id: "strasse",
         label: "Adresses (Strasse, Weg, Gasse…)",
