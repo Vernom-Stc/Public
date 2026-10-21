@@ -1,0 +1,11 @@
+Kerckhoffs
+
+« 1883. Il faut qu'il n'exige pas le secret, et qu'il puisse sans inconvénient tomber entre les mains de l'ennemi. Kerckhoffs. »
+
+Copyright 2026 L'auteur de Kerckhoffs et les contributeurs
+
+Ce produit contient des logiciels de tiers, dans le dossier vendor/ :
+- Tesseract.js et tesseract.js-core (Apache License 2.0)
+- PDF.js, Mozilla Foundation (Apache License 2.0)
+- jsPDF (MIT License)
+Leurs licences se trouvent dans les sous-dossiers correspondants.

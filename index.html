@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Verrou : la page ne peut charger ou contacter que ses propres fichiers. Aucun serveur externe. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#14202b">
+<title>Kerckhoffs</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ ACCUEIL ============ -->
+<main id="home" class="screen">
+  <header class="brand">
+    <img src="icons/icon.svg" alt="" class="logo" width="44" height="44">
+    <div>
+      <h1>Kerckhoffs</h1>
+      <p class="tag">Masquez vos données avant de travailler avec une IA.</p>
+    </div>
+  </header>
+
+  <div class="choices">
+    <button class="choice" id="goQuick" type="button">
+      <span class="choice-title">Photo rapide</span>
+      <span class="choice-text">Une image. Effacez au doigt ce que vous voulez cacher, copiez, collez dans l'IA.</span>
+    </button>
+    <button class="choice" id="goFolder" type="button">
+      <span class="choice-title">Dossier</span>
+      <span class="choice-text">Plusieurs pages, détection automatique des noms et numéros, export en PDF, image allégée ou texte.</span>
+    </button>
+  </div>
+
+  <section class="offline">
+    <p class="offline-state" id="offlineState">Préparation du mode hors ligne…</p>
+    <p>Kerckhoffs ne se connecte jamais à internet. <strong>Faites le test : activez le mode avion</strong>, puis utilisez l'application normalement.</p>
+  </section>
+
+  <p class="home-links">
+    <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
+  </p>
+  <p class="fineprint">Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+</main>
+
+<!-- ============ ESPACE DE TRAVAIL ============ -->
+<main id="work" class="screen" hidden>
+  <header class="bar">
+    <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">←</button>
+    <h2 id="workTitle">Photo rapide</h2>
+    <span class="pageinfo" id="pageInfo"></span>
+  </header>
+
+  <!-- Ajout de pages -->
+  <div class="adders" id="adders">
+    <button class="btn primary" id="btnCam" type="button">Prendre une photo</button>
+    <button class="btn" id="btnFile" type="button">Importer</button>
+    <input type="file" id="inCam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
+  </div>
+
+  <!-- Termes à masquer (dossier) -->
+  <details class="panel" id="termsPanel" open>
+    <summary>Ce que Kerckhoffs doit masquer</summary>
+    <div class="fields">
+      <label for="tNames">Noms et prénoms</label>
+      <input type="text" id="tNames" autocomplete="off" placeholder="Ex. Jean Exemple, Marie Exemple">
+      <label for="tAddr">Adresses</label>
+      <input type="text" id="tAddr" autocomplete="off" placeholder="Ex. Rue du Lac 12, 1003 Lausanne">
+      <label for="tOther">Autres termes</label>
+      <input type="text" id="tOther" autocomplete="off" placeholder="Employeur, n° de dossier, nom du cabinet…">
+      <p class="hint">Séparez par des virgules. Les numéros AVS, IBAN, téléphones, e-mails et longs numéros sont trouvés tout seuls.</p>
+    </div>
+  </details>
+
+  <!-- Éditeur -->
+  <div class="viewport" id="viewport">
+    <canvas id="cv" width="10" height="10"></canvas>
+    <div class="empty" id="empty">
+      <p>Prenez une photo ou importez un document pour commencer.</p>
+    </div>
+  </div>
+
+  <div class="pages" id="pages" hidden></div>
+
+  <div class="tools">
+    <label class="brush" for="brush">Pinceau
+      <input type="range" id="brush" min="1" max="10" value="3">
+    </label>
+    <button class="btn" id="undo" type="button">Annuler</button>
+    <button class="btn" id="detect" type="button">Détecter</button>
+  </div>
+  <p class="hint tools-hint" id="toolsHint">Un doigt : effacer. Deux doigts : zoomer et déplacer. Touchez une zone détectée pour la masquer ou la démasquer.</p>
+  <p class="status" id="status" role="status"></p>
+
+  <!-- Export -->
+  <section class="panel export">
+    <div class="opts">
+      <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
+      <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnShare" type="button">Partager</button>
+      <button class="btn" id="btnCopy" type="button">Copier</button>
+      <button class="btn" id="btnSave" type="button">Enregistrer</button>
+    </div>
+    <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées. Vérifiez l'image avant de l'envoyer.</p>
+  </section>
+
+  <p class="legend" id="legend" hidden></p>
+</main>
+
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script src="vendor/jspdf/jspdf.umd.min.js"></script>
+<script src="vendor/tesseract/tesseract.min.js"></script>
+<script src="rules/commun.js"></script>
+<script src="rules/suisse.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
