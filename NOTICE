@@ -10,4 +10,5 @@ Ce produit contient des logiciels de tiers, dans le dossier vendor/ :
 - jsPDF (MIT License)
 - qrcode-generator, Kazuhiko Arase (MIT License)
 - jsQR, Cosmo Wolfe (Apache License 2.0)
+- TweetNaCl.js (domaine public, Unlicense)
 Leurs licences se trouvent dans les sous-dossiers correspondants.

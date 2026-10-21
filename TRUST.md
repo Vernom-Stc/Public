@@ -27,9 +27,13 @@ You don't need any technical knowledge to verify this.
 
 That phone becomes a closed box: there is no physical way for it to send anything. You then move the redacted PDF to your computer with a cable.
 
-### Test 3: the store listing (Android app, coming later)
+### Test 3: the author's signature
 
-On the Google Play Store, open the Kerckhoffs page, then "About this app" and "App permissions". You will **not** find "Full network access". Without that permission, Android forbids the app from connecting to the internet. It is your phone that blocks it, not a promise from us.
+Tap "Vérifier ma version" on the home screen. It shows a fingerprint such as `9A71-FC92-65A0-DC72`, which must match the one published for that release in [VERSIONS.md](VERSIONS.md) at the official address.
+
+After that, the app keeps watch: before every update, your installed version checks the new release's signature file by file. If anyone other than the author changed a single byte, for instance by taking over the repository, the update is refused and a red banner warns you.
+
+One honest limit: on the web, the browser has the last word on updates. For sensitive use (lawyers, doctors, public services), use the **frozen version**: one signed file, downloadable from the home screen, that opens with a double-click, works offline and never updates itself.
 
 ## What leaves your phone, and what doesn't
 

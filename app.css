@@ -242,6 +242,11 @@ input[type=password]{width:100%;font:16px var(--ui);color:var(--ink);background:
   padding-top:max(10px,env(safe-area-inset-top,0px));padding-bottom:10px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .maj span{flex:1 1 200px}
+.maj .empreinte{flex:1 1 100%;font-size:.8rem;opacity:.85;order:3}
+.maj.danger{background:#a4161a}
+.maj.danger .btn.primary{color:#a4161a}
+.empreinte{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.03em}
+.empreinte.ok{color:#1b6e3a}.empreinte.ko{color:#a4161a}
 .maj .btn.primary{background:#fff;color:#002366;border-color:#fff}
 .maj .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
 .crop-screen{position:absolute;left:10px;top:10px;z-index:4;white-space:nowrap;box-shadow:0 0 0 3px rgba(255,255,255,.6)}

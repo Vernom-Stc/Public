@@ -11,7 +11,9 @@
   const LIGHT_DIM = 1600;        // taille maximale d'une image allégée
   const abs = (p) => new URL(p, location.href).href;
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc = abs("vendor/pdfjs/pdf.worker.min.js");
+  // Version figée (un seul fichier, sans mise à jour) : les moteurs sont inclus dans le fichier lui-même.
+  const FIGE = window.KerckhoffsFige || null;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = FIGE ? FIGE.pdfWorker : abs("vendor/pdfjs/pdf.worker.min.js");
 
   // Règles : communes + celles du pays choisi (rules/pays/*.js). Les longs numéros passent en dernier.
   const K = window.Kerckhoffs;
@@ -780,9 +782,9 @@
   function getWorker() {
     if (!workerP) {
       workerP = Tesseract.createWorker("fra", 1, {
-        workerPath: abs("vendor/tesseract/worker.min.js"),
-        corePath: abs("vendor/tesseract/core"),
-        langPath: abs("vendor/tesseract/lang"),
+        workerPath: FIGE ? FIGE.ocrWorker : abs("vendor/tesseract/worker.min.js"),
+        corePath: FIGE ? "fige/core" : abs("vendor/tesseract/core"),
+        langPath: FIGE ? "fige/lang" : abs("vendor/tesseract/lang"),
         workerBlobURL: false,
         cacheMethod: "none",
         logger: (m) => {
@@ -824,8 +826,14 @@
     while (lo < 255 && (acc += hist[lo]) < total * 0.01) lo++;
     acc = 0;
     while (hi > 0 && (acc += hist[hi]) < total * 0.05) hi--;
-    const span = Math.max(1, hi - lo);
-    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)); d[i] = d[i + 1] = d[i + 2] = v; }
+    // Renforcer le contraste seulement si l'image est terne (papier gris, encre pâle).
+    // Sur une page blanche avec peu de texte, les repères tombent sur le blanc : on ne touche à rien.
+    const span = hi - lo;
+    const etirer = span >= 60 && span < 230;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = etirer ? Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)) : d[i];
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
     x.putImageData(im, 0, 0);
     return c;
   }
@@ -1622,7 +1630,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.9";
+  const VERSION_APP = "0.5.0";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
@@ -1639,34 +1647,76 @@
   })();
 
   /* ------------------------------------------------------ hors ligne et mises à jour */
+  // Le contrôle des signatures est dans verification.js. Ici, on ne fait que l'appeler et afficher le résultat.
+  const V = window.KerckhoffsVerification;
+  const CACHE_ACTUEL = "kerckhoffs-v" + VERSION_APP;
+  function afficherEmpreinte(r) {
+    const el = $("verEmpreinte");
+    if (!r) { el.textContent = "disponible une fois l'application gardée sur l'appareil"; el.className = "empreinte"; return; }
+    el.textContent = r.ok ? `${r.empreinte} · signée par l'auteur ✓` : `${r.empreinte ? r.empreinte + " · " : ""}NON signée : ${r.raison}`;
+    el.className = "empreinte " + (r.ok ? "ok" : "ko");
+  }
   const st = $("offlineState");
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
-    const avaitUneVersion = !!navigator.serviceWorker.controller;
-    let nouvelleVersion = false;
+    let enAttente = null, activationDemandee = false;
+    const examiner = async (reg) => {
+      const w = reg.waiting;
+      if (!w || w === enAttente || !navigator.serviceWorker.controller) return;
+      enAttente = w;
+      // La nouvelle version est déjà sur l'appareil, mise de côté. La version actuelle la vérifie avant tout.
+      const noms = (await caches.keys()).filter((k) => k.startsWith("kerckhoffs-") && k !== CACHE_ACTUEL);
+      let r = { ok: false, raison: "Ses fichiers sont introuvables." };
+      for (const n of noms) { r = await V.verifierCopie(n); if (r.ok) break; }
+      montrerBandeau(r, w);
+    };
     navigator.serviceWorker.register("sw.js").then((reg) => {
-      // Vérifier la page officielle à l'ouverture, et à chaque retour dans l'application.
+      examiner(reg);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if (w) w.addEventListener("statechange", () => { if (w.state === "installed") examiner(reg); });
+      });
+      // Regarder s'il y a une nouvelle version à l'ouverture, et à chaque retour dans l'application.
       document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
       return navigator.serviceWorker.ready;
-    }).then(() => {
+    }).then(async () => {
       st.textContent = "Prêt pour le mode avion"; st.classList.add("ready");
-    }).catch(() => { st.textContent = "Mode hors ligne indisponible sur ce navigateur"; });
-    // Une nouvelle version vient de s'installer : on propose de l'utiliser, sans jamais effacer un travail en cours.
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!avaitUneVersion || nouvelleVersion) return;
-      nouvelleVersion = true;
-      montrerBandeau();
+      afficherEmpreinte(await V.verifierCopie(CACHE_ACTUEL));
+    }).catch(() => { st.textContent = "Mode hors ligne indisponible sur ce navigateur"; afficherEmpreinte(null); });
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (activationDemandee) location.reload(); });
+    $("majOk").addEventListener("click", () => {
+      if (!enAttente || !$("majBandeau").dataset.ok) return;
+      activationDemandee = true;
+      enAttente.postMessage("activer");
     });
+  } else if (FIGE) {
+    st.textContent = "Version figée : sans internet, sans mise à jour"; st.classList.add("ready");
+    $("installBloc").hidden = true; $("lienFige").hidden = true;
+    $("verOrigine").textContent = "ce fichier, sur votre appareil";
+    $("verOfficielle").textContent = "aucune : cette version ne se connecte jamais";
+    const el = $("verEmpreinte");
+    el.textContent = "fichier figé : vérifiez-le avec sa signature, publiée dans VERSIONS.md";
+    el.className = "empreinte";
   } else {
     st.textContent = "Ouvrez Kerckhoffs depuis son adresse web pour l'utiliser hors ligne";
+    afficherEmpreinte(null);
   }
-  function montrerBandeau() {
-    const b = $("majBandeau");
+  function montrerBandeau(r, w) {
+    const b = $("majBandeau"), e = $("majEmpreinte");
     b.hidden = false;
-    $("majTexte").textContent = S.pages.length
-      ? "Nouvelle version disponible. Terminez d'abord votre travail : l'utiliser efface l'ardoise."
-      : "Nouvelle version disponible.";
+    b.classList.toggle("danger", !r.ok);
+    b.dataset.ok = r.ok ? "1" : "";
+    $("majOk").hidden = !r.ok;
+    $("majPlusTard").textContent = r.ok ? "Plus tard" : "Compris";
+    e.hidden = !r.empreinte;
+    e.textContent = r.empreinte ? "Empreinte : " + r.empreinte : "";
+    if (r.ok) {
+      $("majTexte").textContent = `Nouvelle version ${r.version}, signée par l'auteur ✓` +
+        (S.pages.length ? " Terminez d'abord votre travail : l'utiliser efface l'ardoise." : "");
+    } else {
+      $("majTexte").textContent = "Attention : une nouvelle version NON signée par l'auteur est apparue. Elle a été bloquée. " +
+        "Ne rouvrez pas Kerckhoffs avant d'avoir vérifié l'adresse officielle : le navigateur pourrait l'installer à la prochaine ouverture. (" + r.raison + ")";
+    }
   }
-  $("majOk").addEventListener("click", () => location.reload());
   $("majPlusTard").addEventListener("click", () => { $("majBandeau").hidden = true; });
 
   /* ---------------------------------------- installer Kerckhoffs comme une application */

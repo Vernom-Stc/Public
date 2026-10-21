@@ -27,9 +27,13 @@ Vous n'avez pas besoin de connaissances techniques pour vous en assurer.
 
 Ce téléphone devient une machine fermée : aucun moyen physique d'envoyer quoi que ce soit. Vous transférez ensuite le PDF masqué par câble vers votre ordinateur.
 
-### Test 3 : la fiche du store (application Android, à venir)
+### Test 3 : la signature de l'auteur
 
-Sur le Google Play Store, ouvrez la fiche de Kerckhoffs, puis « À propos de l'appli » et « Autorisations ». Vous ne trouverez **pas** « Accès complet au réseau ». Sans cette autorisation, Android interdit à l'application de se connecter à internet. C'est le téléphone lui-même qui l'empêche, pas une promesse de notre part.
+Touchez « Vérifier ma version » sur l'accueil. L'écran affiche une empreinte, par exemple `9A71-FC92-65A0-DC72`. Elle doit être identique à celle publiée pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
+
+Ensuite, c'est l'application qui veille : avant chaque mise à jour, votre version vérifie elle-même la signature de la nouvelle, fichier par fichier. Si quelqu'un d'autre que l'auteur a changé un seul octet, par exemple en prenant le contrôle du dépôt, la mise à jour est refusée et un bandeau rouge vous prévient.
+
+Une limite, dite franchement : sur le web, c'est le navigateur qui a le dernier mot sur les mises à jour. Pour les usages sensibles (avocats, médecins, administrations), utilisez donc la **version figée** : un seul fichier signé, à télécharger depuis l'accueil, qui s'ouvre d'un double-clic, fonctionne sans internet et ne se met jamais à jour tout seul.
 
 ## Ce qui sort de votre téléphone, et ce qui n'en sort pas
 

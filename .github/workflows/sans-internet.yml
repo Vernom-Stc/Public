@@ -15,7 +15,7 @@ jobs:
         run: |
           # Le code propre à Kerckhoffs ne doit contenir aucun appel réseau ni adresse externe.
           # sw.js est la seule exception autorisée : il lit les fichiers de Kerckhoffs lui-même.
-          files="app.js rules/registre.js rules/commun.js rules/pays/*.js index.html"
+          files="app.js verification.js rules/registre.js rules/commun.js rules/pays/*.js index.html"
           if grep -nE "fetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|RTCPeerConnection|importScripts|https?://" $files; then
             echo "::error::Un accès réseau ou une adresse externe a été ajouté. Kerckhoffs ne doit jamais se connecter à internet."
             exit 1
@@ -32,3 +32,6 @@ jobs:
         run: |
           grep -q "connect-src 'self'" index.html || { echo "::error::La règle connect-src 'self' a été retirée de index.html."; exit 1; }
           grep -q "url.origin !== self.location.origin" sw.js || { echo "::error::Le blocage des requêtes externes a été retiré de sw.js."; exit 1; }
+
+      - name: La version est signée par l'auteur
+        run: node outils/verifier.mjs

@@ -1,15 +1,22 @@
 /*
  * Kerckhoffs — service worker.
- * 1. Garde une copie de l'application sur l'appareil pour fonctionner en mode avion.
- * 2. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
- * Changez VERSION à chaque mise à jour de l'application.
+ * 1. Garde une copie de l'application sur l'appareil : elle fonctionne en mode avion,
+ *    et c'est toujours cette copie, vérifiée, qui s'ouvre.
+ * 2. Une nouvelle version est mise de côté sans être utilisée. L'application vérifie d'abord
+ *    sa signature (verification.js) et ne l'active que si vous acceptez.
+ * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
+ * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.4.9";
+const VERSION = "kerckhoffs-v0.5.0";
 const FILES = [
   "./",
   "index.html",
   "app.css",
   "app.js",
+  "verification.js",
+  "sw.js",
+  "empreintes.txt",
+  "empreintes.sig",
   "manifest.webmanifest",
   "rules/registre.js",
   "rules/commun.js",
@@ -25,6 +32,7 @@ const FILES = [
   "vendor/tesseract/tesseract.min.js",
   "vendor/qrcode/qrcode.js",
   "vendor/jsqr/jsQR.js",
+  "vendor/tweetnacl/nacl.min.js",
   "vendor/tesseract/worker.min.js",
   "vendor/tesseract/core/tesseract-core-lstm.wasm.js",
   "vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js",
@@ -33,11 +41,12 @@ const FILES = [
 
 self.addEventListener("install", (e) => {
   // cache: "reload" : toujours prendre les fichiers frais du serveur, jamais une vieille copie du navigateur.
-  e.waitUntil(
-    caches.open(VERSION)
-      .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
-      .then(() => self.skipWaiting())
-  );
+  // Pas d'activation automatique : la nouvelle version attend d'être vérifiée et acceptée.
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
+});
+
+self.addEventListener("message", (e) => {
+  if (e.data === "activer") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
@@ -55,18 +64,10 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (e.request.method !== "GET") return;
-  // Les gros fichiers (moteur de lecture, bibliothèques) : copie locale d'abord.
-  if (url.pathname.includes("/vendor/")) {
-    e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));
-    return;
-  }
-  // L'application elle-même : la dernière version en ligne si possible, la copie locale en mode avion.
+  // Toujours la copie vérifiée gardée sur l'appareil. Internet ne sert qu'à l'installer.
   e.respondWith(
-    fetch(e.request, { cache: "no-cache" })
-      .then((res) => {
-        if (res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); }
-        return res;
-      })
-      .catch(() => caches.match(e.request, { ignoreSearch: true }))
+    caches.open(VERSION)
+      .then((c) => c.match(e.request, { ignoreSearch: true }))
+      .then((hit) => hit || fetch(e.request))
   );
 });

@@ -24,6 +24,7 @@ Lisez [CONFIANCE.md](CONFIANCE.md) ([English: TRUST.md](TRUST.md)). En bref :
 - **Double verrou** : la page interdit au navigateur de contacter un autre site (règle de sécurité CSP), et le service worker refuse toute requête vers l'extérieur.
 - **Tout le code est public**, y compris les bibliothèques utilisées, copiées dans `vendor/`.
 - **Un contrôle automatique** bloque toute modification qui ajouterait un accès à internet (`.github/workflows/sans-internet.yml`).
+- **Chaque version est signée** par l'auteur, et l'application refuse toute mise à jour non signée. Pour les usages sensibles, une **version figée** en un seul fichier signé ne se met jamais à jour toute seule. Voir [VERSIONS.md](VERSIONS.md).
 
 ## Ce que Kerckhoffs ne fait pas à votre place
 

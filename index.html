@@ -51,8 +51,8 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.4.9 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.5.0.html" download>Version figée, pour les usages sensibles</a></p>
+  <p class="fineprint">Version 0.5.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -203,6 +203,7 @@
 <!-- Bandeau de mise à jour -->
 <div class="maj" id="majBandeau" hidden role="status">
   <span id="majTexte">Nouvelle version disponible.</span>
+  <span id="majEmpreinte" class="empreinte" hidden></span>
   <button class="btn small primary" id="majOk" type="button">Utiliser</button>
   <button class="btn small" id="majPlusTard" type="button">Plus tard</button>
 </div>
@@ -277,9 +278,11 @@
       <dt>Version</dt><dd id="verVersion"></dd>
       <dt>Vous l'utilisez depuis</dt><dd id="verOrigine"></dd>
       <dt>Adresse officielle</dt><dd id="verOfficielle"></dd>
+      <dt>Empreinte</dt><dd id="verEmpreinte" class="empreinte">calcul…</dd>
     </dl>
-    <p>Les deux adresses doivent être identiques. Chaque version officielle est signée par l'auteur de Kerckhoffs : son numéro, son empreinte et sa signature sont publiés dans le fichier VERSIONS.md du dépôt officiel, et vérifiables avec n'importe quel portefeuille Bitcoin.</p>
-    <p class="hint">Une copie peut afficher ce même écran : la seule preuve, c'est la signature publiée à l'adresse officielle. En cas de doute, téléchargez Kerckhoffs à nouveau depuis l'adresse officielle.</p>
+    <p>Les deux adresses doivent être identiques, et l'empreinte doit être la même que celle publiée pour cette version dans VERSIONS.md, à l'adresse officielle. Chaque version officielle est signée par l'auteur de Kerckhoffs.</p>
+    <p>Ensuite, vous n'avez plus rien à faire : avant chaque mise à jour, votre version vérifie elle-même la signature de la nouvelle. Une version non signée est refusée.</p>
+    <p class="hint">Une fausse copie pourrait afficher ce même écran : la seule preuve, c'est l'empreinte publiée à l'adresse officielle. Pour les usages sensibles, il existe aussi un fichier signé qui ne se met jamais à jour tout seul.</p>
     <button class="btn primary" id="verifOk" type="button">J'ai vérifié</button>
   </div>
 </section>
@@ -295,6 +298,8 @@
 <script src="rules/etiquettes.js"></script>
 <!-- Un fichier par pays : voir rules/LISEZMOI.md -->
 <script src="rules/pays/ch.js"></script>
+<script src="vendor/tweetnacl/nacl.min.js"></script>
+<script src="verification.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
