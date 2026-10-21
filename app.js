@@ -746,16 +746,18 @@
     if (!S.sel || busy) return;
     const { page: p, rect } = S.sel;
     S.sel = null; $("selbar").hidden = true;
+    // La zone encadrée est toujours masquée, quoi que la lecture trouve ensuite.
+    maskRect(p, rect); afterEdit();
     try {
       setStatus("Lecture du texte…", true);
       await ocr(p);
-    } catch (e) { setStatus("La lecture du texte a échoué : la zone a été masquée seule."); maskRect(p, rect); afterEdit(); return; }
+    } catch (e) { setStatus("La lecture du texte a échoué : la zone a été masquée seule."); return; }
     const dedans = [];
     p.lines.forEach((l) => l.words.forEach((w) => {
       const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
       if (cx >= rect.x && cx <= rect.x + rect.w && cy >= rect.y && cy <= rect.y + rect.h) dedans.push(w.text);
     }));
-    if (!dedans.length) { maskRect(p, rect); afterEdit(); setStatus("Aucun texte lu dans cette zone : elle a été masquée seule."); return; }
+    if (!dedans.length) { setStatus("Aucun texte lu dans cette zone : elle a été masquée seule."); return; }
     const texte = dedans.join(" ").replace(/[,;:]+$/, "");
     const m = motifDe(texte);
     let type;
@@ -768,7 +770,7 @@
     S.tokens = new Map(); S.counters = {};
     await detectPages(S.pages, () => {
       const n = S.pages.reduce((s, q) => s + q.boxes.filter((b) => b.active && b.token.startsWith("[" + type + "_")).length, 0);
-      if (!n) { maskRect(p, rect); afterEdit(); return "Rien de semblable trouvé : la zone a été masquée seule."; }
+      if (!n) { return "Rien de semblable trouvé : la zone a été masquée seule."; }
       return `${n} ${n > 1 ? m.pl : m.sg} masqué${m.fem ? "e" : ""}${n > 1 ? "s" : ""} sur tout le document (« ${texte} »). Touchez une zone pour la démasquer.`;
     });
   });
@@ -1620,7 +1622,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.8";
+  const VERSION_APP = "0.4.9";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
