@@ -6,6 +6,7 @@ Chaque version officielle est signée par l'auteur de Kerckhoffs. Cette liste es
 
 | Version | Date | Empreinte de l'application | Version figée (SHA-256 du fichier) |
 |---|---|---|---|
+| 0.5.7 | 2026-10-21 | `AAA1-1089-F052-6C5D` | `7339eda53e525ea82e73ed0161c0124ca0318fd2a42015ed7f3920152cd7fbdf` |
 | 0.5.6 | 2026-10-21 | `05C1-F377-79F0-A06E` | `f9b311d5425985f9d3832fe6d83b033511aa63ad4ae87cf7b17dc0495995565f` |
 | 0.5.5 | 2026-10-21 | `C0CC-82AE-7040-7873` | `947c07a4972f92aa9d853d2e9a7d0c0dbec5d0d2639538f950d355d885a8a616` |
 | 0.5.4 | 2026-10-21 | `472A-B65C-0F24-E20B` | `f81d5c155161d628cef47db4cf78634c4ca1c032fe3ba89f007515f53bcc31bd` |

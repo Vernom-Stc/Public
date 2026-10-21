@@ -448,7 +448,27 @@
       ctx.setLineDash([12, 8]); ctx.lineWidth = Math.max(3, cv.width / 400); ctx.strokeStyle = "#2b5fe0";
       ctx.strokeRect(r.x, r.y, r.w, r.h);
       ctx.restore();
+      poignees(r, "#2b5fe0");
     }
+    if (S.cadre && S.cadre.page === p) poignees(S.cadre.rect, "#ffffff");
+  }
+  // Les quatre coins d'une sélection : on les tire pour l'agrandir, on glisse l'intérieur pour la déplacer.
+  function poignees(r, couleur) {
+    const t = 11 / S.view.s;
+    ctx.save(); ctx.lineWidth = 3 / S.view.s; ctx.fillStyle = couleur; ctx.strokeStyle = "#002366";
+    for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]) {
+      ctx.beginPath(); ctx.arc(x, y, t, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Le doigt touche-t-il un coin, l'intérieur, ou rien ?
+  function prise(r, x, y) {
+    const t = 26 / S.view.s;
+    const coins = [[r.x, r.y, "hg"], [r.x + r.w, r.y, "hd"], [r.x, r.y + r.h, "bg"], [r.x + r.w, r.y + r.h, "bd"]];
+    const c = coins.find(([cx, cy]) => Math.hypot(x - cx, y - cy) <= t);
+    if (c) return c[2];
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return "milieu";
+    return null;
   }
 
   /* ---------------------- doigt : pinceau, rectangle, gomme, zoom, retour */
@@ -472,7 +492,7 @@
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
       crop: "Zoomez et déplacez avec deux doigts pour ne voir que la feuille, puis touchez « Garder ce qui est à l'écran ». Ou glissez en diagonale autour de la feuille.",
-      rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, masquer tous les pareils (par exemple toutes les dates), ou la répéter au même endroit sur chaque page.",
+      rect: "Glissez en diagonale pour sélectionner une zone. Mal visé ? Faites glisser la sélection, ou tirez ses coins. Puis choisissez : la masquer, masquer tous les pareils, ou la répéter au même endroit sur chaque page.",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
     if (page()) setStatus(hints[tool]);
@@ -523,7 +543,12 @@
       const pt = toImg(e.clientX, e.clientY);
       if (tool === "move") draft = { kind: "pan", pt, tx0: S.view.tx, ty0: S.view.ty };
       else if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
-      else if (tool === "rect" || tool === "crop") draft = { kind: tool, x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
+      else if (tool === "rect" || tool === "crop") {
+        const cible = tool === "rect" ? (S.sel && S.sel.page === page() ? S.sel : null) : (S.cadre && S.cadre.page === page() ? S.cadre : null);
+        const ou = cible ? prise(cible.rect, pt[0], pt[1]) : null;
+        if (ou) draft = { kind: "ajuster", cible, ou, pt0: pt, r0: { ...cible.rect } };
+        else draft = { kind: tool, x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
+      }
       else { draft = { kind: "erase" }; if (eraseAt(page(), pt[0], pt[1])) afterEdit(); }
     } else if (ptrs.size === 2) {
       if (draft && draft.kind !== "erase") render();
@@ -558,6 +583,16 @@
       const last = draft.pts[draft.pts.length - 1];
       draft.pts.push(pt);
       strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] });
+    } else if (draft.kind === "ajuster") {
+      const { r0, ou } = draft, dx = pt[0] - draft.pt0[0], dy = pt[1] - draft.pt0[1], r = draft.cible.rect;
+      if (ou === "milieu") { r.x = r0.x + dx; r.y = r0.y + dy; }
+      else {
+        let x0 = r0.x, y0 = r0.y, x1 = r0.x + r0.w, y1 = r0.y + r0.h;
+        if (ou[1] === "g") x0 += dx; else x1 += dx;
+        if (ou[0] === "h") y0 += dy; else y1 += dy;
+        r.x = Math.min(x0, x1); r.y = Math.min(y0, y1); r.w = Math.max(4, Math.abs(x1 - x0)); r.h = Math.max(4, Math.abs(y1 - y0));
+      }
+      render();
     } else if (draft.kind === "rect" || draft.kind === "crop") {
       draft.x = Math.min(draft.x0, pt[0]); draft.y = Math.min(draft.y0, pt[1]);
       draft.w = Math.abs(pt[0] - draft.x0); draft.h = Math.abs(pt[1] - draft.y0);
@@ -574,6 +609,7 @@
     const p = page(), d = draft;
     draft = null;
     if (d.kind === "erase") return;
+    if (d.kind === "ajuster") { render(); return; } // la sélection reste, à sa nouvelle place
     if (d.kind === "pan") {
       if (!moved) { const hit = hitBox(p, d.pt[0], d.pt[1]); if (hit) { toggleBox(p, hit); afterEdit(); } }
       return;
@@ -1655,7 +1691,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.6";
+  const VERSION_APP = "0.5.7";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;
