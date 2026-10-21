@@ -66,6 +66,9 @@
   // Le message s'affiche sous l'image et, bien visible, par-dessus l'image.
   let busy = false;
   let toastTimer = null;
+  // Le message du bas se ferme d'un toucher, et dès qu'on touche l'image : il ne gêne jamais le travail.
+  function fermerToast() { clearTimeout(toastTimer); $("toast").hidden = true; }
+  $("viewport").addEventListener("pointerdown", fermerToast, true);
   function setStatus(t, keep) {
     $("status").textContent = t || "";
     const el = $("toast");
@@ -940,6 +943,15 @@
           take(nr, k, k + needle.length, t.type, t.value, t.key);
         }
       }
+      // Puis mot par mot, en tolérant les erreurs de lecture (rules/registre.js : K.ressemble).
+      // Ainsi « Dupont » est trouvé même lu « DUP0NT », et une adresse même coupée ou mal espacée.
+      for (const t of terms) {
+        if (t.needle) continue;
+        const cherches = K.motsACherche(t.value);
+        words.forEach((w, i) => {
+          if (!used.has(i) && cherches.some((c) => K.ressemble(w.text, c))) take(rr, rr[i][0], rr[i][1], t.type, t.value, t.key);
+        });
+      }
     }
   }
 
@@ -957,10 +969,20 @@
       changed(); render();
       const n = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.active).length, 0);
       const flagged = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.flag).length, 0);
-      if (message) setStatus(message()); else setStatus(n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
+      // Ce que vous avez écrit dans « Réglages » et qui n'a été retrouvé nulle part : on le dit, pour que vous l'encadriez vous-même.
+      const trouvees = new Set(S.pages.flatMap((p) => p.boxes.map((b) => b.key)));
+      const masques = S.pages.flatMap((p) => p.boxes.flatMap((b) => (b.words || []).map((w) => w.text)));
+      const estMasque = (t) => trouvees.has(t.key) || (K.motsACherche(t.value).length > 0 &&
+        K.motsACherche(t.value).every((c) => masques.some((m) => K.ressemble(m, c) || norm(m).includes(norm(c)))));
+      const absents = [...new Map(userTerms().filter((t) => !t.needle && !estMasque(t)).map((t) => [t.key, t.value])).values()];
+      const manque = absents.length
+        ? ` Pas retrouvé${absents.length > 1 ? "s" : ""} : « ${absents.slice(0, 4).join(" », « ")} »${absents.length > 4 ? "…" : ""}. ` +
+          "La photo est peut-être trop pâle à cet endroit : encadrez-le avec « Rectangle »."
+        : "";
+      if (message) setStatus(message() + manque, !!manque); else setStatus((n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
                   : (S.mode === "quick"
                       ? "Rien trouvé automatiquement. Pour les noms, écrivez-les dans « Réglages », ou effacez-les au doigt."
-                      : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher."));
+                      : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher.")) + manque, !!manque);
     } catch (e) {
       setStatus("La lecture du texte a échoué (" + ((e && (e.message || e)) + "").slice(0, 120) + "). Effacez au doigt, ou réessayez.");
     } finally {
@@ -1633,7 +1655,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.5";
+  const VERSION_APP = "0.5.6";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

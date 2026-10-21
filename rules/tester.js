@@ -83,6 +83,11 @@ for (const e of K.etiquettes) {
 console.log(`  ${K.etiquettes.length} groupe(s) d'étiquettes vérifié(s)`);
 for (const code of Object.keys(K.pays)) tester(`${K.pays[code].nom} (${code})`, K.pays[code].regles);
 
+console.log("Ressemblance (mots de Réglages, malgré les erreurs de lecture)");
+for (const [lu, cherche] of K.exemplesRessemblance.trouve) if (!K.ressemble(lu, cherche)) ko(`« ${lu} » devrait être reconnu comme « ${cherche} »`);
+for (const [lu, cherche] of K.exemplesRessemblance.ignore) if (K.ressemble(lu, cherche) && K.motsACherche(cherche).length) ko(`« ${lu} » ne devrait pas être pris pour « ${cherche} »`);
+if (K.motsACherche("12 rue Louis-De-Montfalcon").join(",") !== "Louis,Montfalcon") ko(`motsACherche : obtenu « ${K.motsACherche("12 rue Louis-De-Montfalcon")} »`);
+
 // Le modèle doit rester valide, puisqu'on le copie.
 const modele = charger(["rules/pays/_modele.js"]);
 for (const code of Object.keys(modele.pays)) tester("Modèle (_modele.js)", modele.pays[code].regles);

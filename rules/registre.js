@@ -61,4 +61,53 @@
     if (!p || !p.code || !p.nom || !Array.isArray(p.regles)) throw new Error("Pays mal décrit : il faut code, nom et regles.");
     K.pays[p.code] = p;
   };
+
+  /* ---- Retrouver les mots que vous avez écrits dans « Réglages », malgré les erreurs de lecture ----
+   * La lecture d'une photo confond souvent certaines lettres et chiffres (O et 0, l et 1, S et 5…)
+   * ou se trompe d'une lettre. Un mot lu « ressemble » au mot cherché s'il ne diffère que de peu :
+   *   - 3 ou 4 caractères : identique (après les confusions ci-dessous) ;
+   *   - 5 à 8 caractères : une erreur au plus ;
+   *   - 9 caractères ou plus : deux erreurs au plus.
+   */
+  var CONFUSIONS = { "0": "o", "q": "o", "1": "i", "l": "i", "|": "i", "!": "i", "5": "s", "8": "b", "2": "z", "6": "b" };
+  function simplifier(mot) {
+    return String(mot).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "")
+      .replace(/[0-9a-z|!]/g, function (c) { return CONFUSIONS[c] || c; });
+  }
+  function distance(a, b, max) {
+    if (Math.abs(a.length - b.length) > max) return max + 1;
+    var prec = [], i, j;
+    for (j = 0; j <= b.length; j++) prec[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      var cour = [i], mini = i;
+      for (j = 1; j <= b.length; j++) {
+        cour[j] = Math.min(prec[j] + 1, cour[j - 1] + 1, prec[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (cour[j] < mini) mini = cour[j];
+      }
+      if (mini > max) return max + 1;
+      prec = cour;
+    }
+    return prec[b.length];
+  }
+  K.ressemble = function (motLu, motCherche) {
+    var a = simplifier(motLu), b = simplifier(motCherche);
+    if (b.length < 3 || !a) return false;
+    var max = b.length >= 9 ? 2 : b.length >= 5 ? 1 : 0;
+    return distance(a, b, max) <= max;
+  };
+  // Les mots d'une adresse ou d'une référence qui valent la peine d'être cherchés un par un.
+  // Les petits mots courants (« rue », « de », « chemin »…) ne sont pas cherchés seuls : ils sont partout.
+  var COURANTS = ("rue route avenue av chemin ch boulevard bd place pl allee impasse quai sentier strasse str weg gasse platz " +
+    "de du des la le les et en au aux sur sous chez case postale numero no nr ref reference monsieur madame mme").split(" ");
+  K.motsACherche = function (valeur) {
+    return String(valeur).split(/[\s,;\/-]+/).filter(function (m) {
+      var s = simplifier(m);
+      return s.length >= 3 && COURANTS.indexOf(s) < 0 && !/^[0-9oisbz]{1,3}$/.test(s);
+    });
+  };
+  K.exemplesRessemblance = {
+    trouve: [["AKO270MXN", "AKQ278MXN"], ["DUP0NT", "Dupont"], ["Montfalcon,", "MONTFALCON"], ["Léman", "leman"], ["Martln", "Martin"]],
+    ignore: [["Dupond", "Dupuis"], ["Paul", "Pail"], ["rue", "rue"], ["Marc", "Mars"], ["Lausanne", "Lucerne"]],
+  };
 })(typeof window !== "undefined" ? window : globalThis);

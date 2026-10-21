@@ -100,6 +100,7 @@ input[type=text],select{
   position:absolute;left:10px;right:10px;bottom:10px;z-index:2;margin:0;padding:10px 12px;border-radius:10px;
   background:rgba(20,32,43,.92);color:#fff;font-size:.9rem;line-height:1.4;pointer-events:none;
 }
+.toast::after{content:"  · touchez l'image pour fermer";opacity:.6;font-size:.8rem}
 .empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:#c9d3d9}
 .empty p{max-width:30ch;margin:0}
 
