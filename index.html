@@ -50,7 +50,7 @@
 <!-- ============ ESPACE DE TRAVAIL ============ -->
 <main id="work" class="screen" hidden>
   <header class="bar">
-    <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">←</button>
+    <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">Accueil</button>
     <h2 id="workTitle">Photo rapide</h2>
     <span class="pageinfo" id="pageInfo"></span>
   </header>
@@ -89,13 +89,17 @@
   <div class="pages" id="pages" hidden></div>
 
   <div class="tools">
-    <label class="brush" for="brush">Pinceau
-      <input type="range" id="brush" min="1" max="10" value="3">
+    <div class="seg" role="radiogroup" aria-label="Outil">
+      <label><input type="radio" name="tool" value="brush" id="toolBrush" checked> Pinceau</label>
+      <label><input type="radio" name="tool" value="rect" id="toolRect"> Rectangle</label>
+      <label><input type="radio" name="tool" value="erase" id="toolErase"> Gomme</label>
+    </div>
+    <label class="brush" id="brushWrap" for="brush">Épaisseur
+      <input type="range" id="brush" min="2" max="14" value="6">
     </label>
-    <button class="btn" id="undo" type="button">Annuler</button>
     <button class="btn" id="detect" type="button">Détecter</button>
   </div>
-  <p class="hint tools-hint" id="toolsHint">Un doigt : effacer. Deux doigts : zoomer et déplacer. Touchez une zone détectée pour la masquer ou la démasquer.</p>
+  <p class="hint tools-hint" id="toolsHint">Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.</p>
   <p class="status" id="status" role="status"></p>
 
   <!-- Export -->
@@ -105,14 +109,19 @@
       <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
     </div>
     <div class="actions">
-      <button class="btn primary" id="btnShare" type="button">Partager</button>
-      <button class="btn" id="btnCopy" type="button">Copier</button>
-      <button class="btn" id="btnSave" type="button">Enregistrer</button>
+      <button class="btn" id="btnSave" type="button">Enregistrer sur l'appareil</button>
     </div>
     <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées. Vérifiez l'image avant de l'envoyer.</p>
   </section>
 
   <p class="legend" id="legend" hidden></p>
+
+  <!-- Barre fixe en bas de l'écran -->
+  <nav class="dock" aria-label="Actions principales">
+    <button class="btn" id="undo" type="button">↶ Retour</button>
+    <button class="btn" id="btnCopy" type="button">Copier</button>
+    <button class="btn primary" id="btnShare" type="button">Partager</button>
+  </nav>
 </main>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>

@@ -68,6 +68,7 @@
 
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
+    history.length = 0;
     ["tNames", "tAddr", "tOther"].forEach((id) => { $(id).value = ""; });
     $("optMask").checked = true;
     setStatus("");
@@ -77,7 +78,7 @@
   $("back").addEventListener("click", () => {
     if (S.pages.length && !S.leaving) {
       S.leaving = true;
-      setStatus("Touchez encore ← pour tout effacer et revenir à l'accueil.");
+      setStatus("Touchez encore « Accueil » pour tout effacer et revenir.");
       setTimeout(() => { S.leaving = false; }, 4000);
       return;
     }
@@ -104,7 +105,8 @@
     const has = S.pages.length > 0;
     $("empty").hidden = has;
     cv.hidden = !has;
-    ["undo", "detect", "btnShare", "btnCopy", "btnSave", "brush"].forEach((id) => { $(id).disabled = !has; });
+    ["detect", "btnShare", "btnCopy", "btnSave", "brush"].forEach((id) => { $(id).disabled = !has; });
+    updateUndo();
     $("pageInfo").textContent = S.pages.length > 1 ? `page ${S.cur + 1} / ${S.pages.length}` : "";
     $("btnCam").textContent = has && S.mode === "quick" ? "Nouvelle photo" : (has ? "Ajouter une photo" : "Prendre une photo");
     const pg = $("pages");
@@ -210,9 +212,11 @@
     applyView();
   }
 
+  // Un élément dessiné : un trait de pinceau { kind:"line", w, pts } ou un rectangle { kind:"rect", x, y, w, h }.
   function strokePath(c, st) {
     c.save();
     c.fillStyle = "#000"; c.strokeStyle = "#000";
+    if (st.kind === "rect") { c.fillRect(st.x, st.y, st.w, st.h); c.restore(); return; }
     c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = st.w;
     if (st.pts.length === 1) {
       c.beginPath(); c.arc(st.pts[0][0], st.pts[0][1], st.w / 2, 0, Math.PI * 2); c.fill();
@@ -250,15 +254,60 @@
   }
   function render() { const p = page(); if (p) paint(ctx, p, true, false); }
 
-  /* --------------------------------------- doigt : effacer, zoomer, toucher */
+  /* ---------------------- doigt : pinceau, rectangle, gomme, zoom, retour */
   const ptrs = new Map();
-  let stroke = null, moved = false, downAt = null, pinch = null;
+  let draft = null, moved = false, downAt = null, pinch = null;
+  let tool = "brush";
+  const history = []; // actions à annuler : { type:"add"|"remove"|"toggle", page, item, index }
 
   function toImg(cx, cy) {
     const r = $("viewport").getBoundingClientRect();
     return [(cx - r.left - S.view.tx) / S.view.s, (cy - r.top - S.view.ty) / S.view.s];
   }
   const brushW = () => (+$("brush").value / 100) * Math.max(320, Math.min(cv.width, cv.height));
+
+  document.querySelectorAll('input[name="tool"]').forEach((r) => r.addEventListener("change", () => {
+    tool = r.value;
+    $("brushWrap").hidden = tool !== "brush";
+    const hints = {
+      brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
+      rect: "Glissez en diagonale : toute la zone devient noire. Idéal pour une ligne de texte ou un visage.",
+      erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
+    };
+    $("toolsHint").textContent = hints[tool];
+  }));
+
+  function distSeg(px, py, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
+    const t = l ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / l)) : 0;
+    return Math.hypot(px - (a[0] + t * dx), py - (a[1] + t * dy));
+  }
+  function hitItem(p, x, y) {
+    const tol = 14 / S.view.s; // tolérance du doigt, en pixels d'image
+    for (let i = p.strokes.length - 1; i >= 0; i--) {
+      const st = p.strokes[i];
+      if (st.kind === "rect") {
+        if (x >= st.x - tol && x <= st.x + st.w + tol && y >= st.y - tol && y <= st.y + st.h + tol) return i;
+      } else if (st.pts.length === 1) {
+        if (Math.hypot(x - st.pts[0][0], y - st.pts[0][1]) <= st.w / 2 + tol) return i;
+      } else {
+        for (let k = 1; k < st.pts.length; k++) if (distSeg(x, y, st.pts[k - 1], st.pts[k]) <= st.w / 2 + tol) return i;
+      }
+    }
+    return -1;
+  }
+  const hitBox = (p, x, y) => [...p.boxes].reverse().find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+
+  function toggleBox(p, b) { b.active = !b.active; history.push({ type: "toggle", page: p, item: b }); }
+  function eraseAt(p, x, y) {
+    const i = hitItem(p, x, y);
+    if (i >= 0) { const [it] = p.strokes.splice(i, 1); history.push({ type: "remove", page: p, item: it, index: i }); return true; }
+    const b = hitBox(p, x, y);
+    if (b && b.active) { toggleBox(p, b); return true; }
+    return false;
+  }
+  function afterEdit() { changed(); render(); renderLegend(); updateUndo(); }
+  function updateUndo() { $("undo").disabled = !history.some((h) => S.pages.includes(h.page)); }
 
   const vp = $("viewport");
   vp.addEventListener("pointerdown", (e) => {
@@ -267,9 +316,13 @@
     ptrs.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptrs.size === 1) {
       downAt = [e.clientX, e.clientY]; moved = false;
-      stroke = { w: brushW(), pts: [toImg(e.clientX, e.clientY)] };
+      const pt = toImg(e.clientX, e.clientY);
+      if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
+      else if (tool === "rect") draft = { kind: "rect", x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
+      else { draft = { kind: "erase" }; if (eraseAt(page(), pt[0], pt[1])) afterEdit(); }
     } else if (ptrs.size === 2) {
-      stroke = null; render();
+      if (draft && draft.kind !== "erase") render();
+      draft = null;
       const [a, b] = [...ptrs.values()];
       const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
       pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]), s0: S.view.s, img: toImg(mid[0], mid[1]) };
@@ -288,28 +341,40 @@
       applyView();
       return;
     }
-    if (!stroke) return;
+    if (!draft) return;
     if (!moved && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) moved = true;
     if (!moved) return;
     const pt = toImg(e.clientX, e.clientY);
-    const last = stroke.pts[stroke.pts.length - 1];
-    stroke.pts.push(pt);
-    strokePath(ctx, { w: stroke.w, pts: [last, pt] });
+    if (draft.kind === "line") {
+      const last = draft.pts[draft.pts.length - 1];
+      draft.pts.push(pt);
+      strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] });
+    } else if (draft.kind === "rect") {
+      draft.x = Math.min(draft.x0, pt[0]); draft.y = Math.min(draft.y0, pt[1]);
+      draft.w = Math.abs(pt[0] - draft.x0); draft.h = Math.abs(pt[1] - draft.y0);
+      render();
+      ctx.save(); ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(draft.x, draft.y, draft.w, draft.h); ctx.restore();
+    } else if (eraseAt(page(), pt[0], pt[1])) afterEdit();
   });
   function endPointer(e) {
     if (!ptrs.has(e.pointerId)) return;
     ptrs.delete(e.pointerId);
-    if (pinch) { if (ptrs.size < 2) pinch = null; stroke = null; return; }
-    if (!stroke) return;
-    const p = page();
-    if (!moved) {
-      const [x, y] = stroke.pts[0];
-      const hit = [...p.boxes].reverse().find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
-      if (hit) { hit.active = !hit.active; stroke = null; changed(); render(); renderLegend(); return; }
+    if (pinch) { if (ptrs.size < 2) pinch = null; draft = null; return; }
+    if (!draft) return;
+    const p = page(), d = draft;
+    draft = null;
+    if (d.kind === "erase") return;
+    if (!moved || (d.kind === "rect" && (d.w < 4 || d.h < 4))) {
+      // Un simple toucher sur une zone détectée la masque ou la démasque.
+      const [x, y] = d.kind === "line" ? d.pts[0] : [d.x0, d.y0];
+      const hit = hitBox(p, x, y);
+      if (hit) { toggleBox(p, hit); afterEdit(); return; }
+      if (d.kind === "rect") { render(); return; }
     }
-    p.strokes.push(stroke);
-    stroke = null;
-    changed(); render();
+    const item = d.kind === "rect" ? { kind: "rect", x: d.x, y: d.y, w: d.w, h: d.h } : d;
+    p.strokes.push(item);
+    history.push({ type: "add", page: p, item });
+    afterEdit();
   }
   vp.addEventListener("pointerup", endPointer);
   vp.addEventListener("pointercancel", endPointer);
@@ -325,9 +390,19 @@
   }, { passive: false });
   window.addEventListener("resize", () => { if (page()) { fitView(); render(); } });
 
+  // Retour : annule la dernière action (trait, rectangle, gomme, zone démasquée).
   $("undo").addEventListener("click", () => {
-    const p = page(); if (!p || !p.strokes.length) return;
-    p.strokes.pop(); changed(); render();
+    while (history.length) {
+      const h = history.pop();
+      if (!S.pages.includes(h.page)) continue;
+      if (h.type === "add") { const i = h.page.strokes.indexOf(h.item); if (i >= 0) h.page.strokes.splice(i, 1); }
+      else if (h.type === "remove") h.page.strokes.splice(Math.min(h.index, h.page.strokes.length), 0, h.item);
+      else if (h.type === "toggle") h.item.active = !h.item.active;
+      const pi = S.pages.indexOf(h.page);
+      if (pi !== S.cur) { S.cur = pi; fitView(); updateUI(); }
+      break;
+    }
+    afterEdit();
   });
 
   /* --------------------------------------------- lecture (OCR) et détection */
