@@ -7,6 +7,7 @@
  *   type  : préfixe du jeton, ex. EMAIL donne [EMAIL_1]
  *   re    : expression régulière, avec le drapeau g
  *   check : fonction facultative ; si elle renvoie false, la zone est signalée « à relire »
+ *   silent: avec check, ignore la zone au lieu de la signaler (pour écarter les faux positifs)
  *
  * Pour adapter Kerckhoffs à un autre pays, copiez rules/suisse.js et modifiez-le.
  */

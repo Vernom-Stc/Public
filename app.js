@@ -56,7 +56,6 @@
     $("home").hidden = true;
     $("work").hidden = false;
     $("workTitle").textContent = mode === "quick" ? "Photo rapide" : "Dossier";
-    $("termsPanel").hidden = mode === "quick";
     $("inFile").multiple = mode !== "quick";
     $("btnFile").textContent = mode === "quick" ? "Importer une image" : "Importer une image ou un PDF";
     $("emptyFile").textContent = $("btnFile").textContent;
@@ -193,7 +192,7 @@
     setStatus("");
     updateUI();
     requestAnimationFrame(() => { fitView(); render(); });
-    if (S.mode === "folder") detectPages(added);
+    detectPages(added); // la détection démarre toute seule, dans les deux modes
   }
 
   $("btnCam").addEventListener("click", () => $("inCam").click());
@@ -472,7 +471,6 @@
   const isWordChar = (c) => !!c && /[a-z0-9]/i.test(c);
 
   function userTerms() {
-    if (S.mode !== "folder") return [];
     const out = [];
     const add = (field, type, splitWords) => $(field).value.split(",").map((s) => s.trim()).filter((s) => s.length > 1).forEach((t) => {
       const key = type + "|" + norm(t);
@@ -526,6 +524,7 @@
         while ((m = r.re.exec(raw))) {
           const v = m[0].trim();
           const bad = r.check && !r.check(v);
+          if (bad && r.silent) continue; // faux positif connu : on ignore
           take(rr, m.index, m.index + m[0].length, r.type, v, r.type + "|" + v.replace(/[\s.]/g, "").toLowerCase(), bad ? "à relire" : null);
         }
       }
@@ -557,7 +556,7 @@
       const flagged = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.flag).length, 0);
       setStatus(n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
                   : (S.mode === "quick"
-                      ? "Aucun numéro trouvé. En photo rapide, « Détecter » repère les numéros AVS, IBAN, téléphones et e-mails, pas les noms : effacez-les au doigt, ou utilisez le mode Dossier."
+                      ? "Rien trouvé automatiquement. Pour les noms, écrivez-les dans « Réglages », ou effacez-les au doigt."
                       : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher."));
     } catch (e) {
       setStatus("La lecture du texte a échoué (" + ((e && (e.message || e)) + "").slice(0, 120) + "). Effacez au doigt, ou réessayez.");
@@ -571,10 +570,9 @@
     detectPages(list.filter(Boolean));
   });
   ["tNames", "tAddr", "tOther"].forEach((id) => $(id).addEventListener("change", () => {
-    const done = S.pages.filter((p) => p.lines);
-    if (!done.length) return;
+    if (!S.pages.length) return;
     S.tokens = new Map(); S.counters = {};
-    done.forEach(detect); changed(); render(); updateUI();
+    detectPages(S.pages); // relit si besoin, puis masque les nouveaux termes partout
   }));
 
   function renderLegend() {
