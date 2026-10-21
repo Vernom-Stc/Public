@@ -7,7 +7,7 @@
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.5.3";
+const VERSION = "kerckhoffs-v0.5.4";
 const FILES = [
   "./",
   "index.html",
@@ -25,7 +25,9 @@ const FILES = [
   "rules/pays/ch.js",
   "icons/icon.svg",
   "icons/icon-180.png",
+  "icons/icon-192.png",
   "icons/icon-512.png",
+  "icons/icon-maskable-512.png",
   "vendor/pdfjs/pdf.min.js",
   "vendor/pdfjs/pdf.worker.min.js",
   "vendor/jspdf/jspdf.umd.min.js",
