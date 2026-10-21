@@ -39,7 +39,7 @@ body{
 
 /* ---- accueil ---- */
 .brand{display:flex;gap:14px;align-items:center;padding-top:12px}
-.logo{border-radius:10px;flex:none}
+.logo{border-radius:10px;flex:none;border:1px solid var(--line)}
 h1{font-size:2rem;line-height:1;margin:0;letter-spacing:-.02em;font-weight:750}
 .tag{margin:4px 0 0;color:var(--muted)}
 .choices{display:grid;gap:12px}
