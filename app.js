@@ -91,6 +91,7 @@
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
     S.extra = []; S.sel = null; $("selbar").hidden = true;
+    S.cadre = null; $("cropbar").hidden = true;
     profilSnapshot = "";
     history.length = 0;
     ["tNames", "tAddr", "tOther"].forEach((id) => { $(id).value = ""; });
@@ -423,6 +424,7 @@
   function render() {
     const p = page(); if (!p) return;
     paint(ctx, p, true, false);
+    if (S.cadre && S.cadre.page === p) dessinerCadre(S.cadre.rect);
     // Point signalé par Cerbère : encadré en orange.
     if (S.flash && S.flash.page === p) {
       ctx.save(); ctx.lineWidth = Math.max(4, cv.width / 300); ctx.strokeStyle = "#ff7a00"; ctx.fillStyle = "rgba(255,122,0,.18)";
@@ -455,9 +457,11 @@
   document.querySelectorAll('input[name="tool"]').forEach((r) => r.addEventListener("change", () => {
     tool = r.value;
     if (S.sel) unselect();
+    if (S.cadre) annulerCadre();
     const hints = {
       move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
       brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
+      crop: "Glissez en diagonale autour de la feuille : tout ce qui est autour (table, autres papiers) sera coupé.",
       rect: "Glissez en diagonale pour sélectionner une zone, puis choisissez : la masquer, ou masquer tous les pareils (par exemple toutes les dates).",
       erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
     };
@@ -509,7 +513,7 @@
       const pt = toImg(e.clientX, e.clientY);
       if (tool === "move") draft = { kind: "pan", pt, tx0: S.view.tx, ty0: S.view.ty };
       else if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
-      else if (tool === "rect") draft = { kind: "rect", x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
+      else if (tool === "rect" || tool === "crop") draft = { kind: tool, x0: pt[0], y0: pt[1], x: pt[0], y: pt[1], w: 0, h: 0 };
       else { draft = { kind: "erase" }; if (eraseAt(page(), pt[0], pt[1])) afterEdit(); }
     } else if (ptrs.size === 2) {
       if (draft && draft.kind !== "erase") render();
@@ -544,11 +548,12 @@
       const last = draft.pts[draft.pts.length - 1];
       draft.pts.push(pt);
       strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] });
-    } else if (draft.kind === "rect") {
+    } else if (draft.kind === "rect" || draft.kind === "crop") {
       draft.x = Math.min(draft.x0, pt[0]); draft.y = Math.min(draft.y0, pt[1]);
       draft.w = Math.abs(pt[0] - draft.x0); draft.h = Math.abs(pt[1] - draft.y0);
       render();
-      ctx.save(); ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(draft.x, draft.y, draft.w, draft.h); ctx.restore();
+      if (draft.kind === "crop") dessinerCadre(draft);
+      else { ctx.save(); ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(draft.x, draft.y, draft.w, draft.h); ctx.restore(); }
     } else if (eraseAt(page(), pt[0], pt[1])) afterEdit();
   });
   function endPointer(e) {
@@ -569,6 +574,12 @@
       const hit = hitBox(p, x, y);
       if (hit) { toggleBox(p, hit); afterEdit(); return; }
       if (d.kind === "rect") { render(); return; }
+    }
+    if (d.kind === "crop") {
+      if (d.w < 20 || d.h < 20) { render(); return; }
+      S.cadre = { page: p, rect: { x: d.x, y: d.y, w: d.w, h: d.h } };
+      $("cropbar").hidden = false; render();
+      return;
     }
     if (d.kind === "rect") { select(p, { x: d.x, y: d.y, w: d.w, h: d.h }); return; }
     const item = d;
@@ -600,11 +611,42 @@
       if (h.type === "add") { const i = h.page.strokes.indexOf(h.item); if (i >= 0) h.page.strokes.splice(i, 1); }
       else if (h.type === "remove") h.page.strokes.splice(Math.min(h.index, h.page.strokes.length), 0, h.item);
       else if (h.type === "toggle") h.item.active = !h.item.active;
+      else if (h.type === "crop") { Object.assign(h.page, h.avant); fitView(); detectPages([h.page]); }
       const pi = S.pages.indexOf(h.page);
       if (pi !== S.cur) { S.cur = pi; fitView(); updateUI(); }
       break;
     }
     afterEdit();
+  });
+
+  /* ------------------------------------- recadrer : ne garder que la feuille */
+  function dessinerCadre(r) {
+    ctx.save();
+    ctx.fillStyle = "rgba(10,14,17,.6)";
+    ctx.beginPath(); ctx.rect(0, 0, cv.width, cv.height); ctx.rect(r.x, r.y, r.w, r.h); ctx.fill("evenodd");
+    ctx.setLineDash([14, 8]); ctx.lineWidth = Math.max(3, cv.width / 400); ctx.strokeStyle = "#ffd34d";
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.restore();
+  }
+  function annulerCadre() { S.cadre = null; $("cropbar").hidden = true; render(); }
+  $("cropCancel").addEventListener("click", annulerCadre);
+  $("cropbar").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("cropOk").addEventListener("click", () => {
+    if (!S.cadre) return;
+    const p = S.cadre.page, r = S.cadre.rect;
+    const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
+    const w = Math.min(p.img.width - x, Math.round(r.w)), h = Math.min(p.img.height - y, Math.round(r.h));
+    if (w < 20 || h < 20) { annulerCadre(); return; }
+    const avant = { img: p.img, strokes: p.strokes, lines: p.lines, boxes: p.boxes };
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(p.img, -x, -y);
+    // Les traits déjà faits suivent le recadrage ; la lecture du texte est refaite sur la nouvelle image.
+    p.strokes = p.strokes.map((st) => st.kind === "rect" ? { ...st, x: st.x - x, y: st.y - y } : { ...st, pts: st.pts.map(([px, py]) => [px - x, py - y]) });
+    p.img = c; p.lines = null; p.boxes = [];
+    history.push({ type: "crop", page: p, avant });
+    S.cadre = null; $("cropbar").hidden = true;
+    fitView(); changed(); render();
+    detectPages([p]);
   });
 
   /* ------------------------------ sélection au rectangle : masquer, ou tous les pareils */
@@ -969,9 +1011,10 @@
     setStatus(`Enregistré (${kb(sizeOf(out))}). Pensez à supprimer le fichier quand vous n'en avez plus besoin.`);
   }
 
-  $("btnSave").addEventListener("click", async () => {
+  async function doSave() {
     try { save(await prepared()); } catch (e) { setStatus("L'export a échoué. Réessayez."); }
-  });
+  }
+  $("btnSave").addEventListener("click", () => { closeSheet(); avecCerbere(doSave); });
 
   async function doShare() {
     let out;
@@ -1289,7 +1332,9 @@
         // Tête 3 : numéros, dates, adresses encore visibles
         chercher(detection, visibles).forEach((h) => ajouter({ tete: 3, label: "Encore visible : " + h.regle.type.toLowerCase(), texte: h.texte, rects: rectsDe(h.mots) }));
         // Tête 2 : mots sensibles (signalés, à laisser si l'IA en a besoin)
-        const texteNorm = visibles.map((w) => ({ w, n: norm(w.text.replace(/[.,;:()«»"]/g, "")), e: w.text.replace(/[.,;:()«»"]/g, "") }));
+        // « e » garde les majuscules ; la lecture confond souvent I et l (« Al » pour « AI ») : on corrige pour les mots courts.
+        const brut = (t) => { const s = t.replace(/[.,;:()«»"]/g, ""); return s.length <= 3 ? s.replace(/l/g, "I") : s; };
+        const texteNorm = visibles.map((w) => ({ w, n: norm(w.text.replace(/[.,;:()«»"]/g, "")), e: brut(w.text) }));
         for (const s of sensibles) {
           const parts = s.n.split(/\s+/);
           for (let i = 0; i + parts.length <= texteNorm.length; i++) {
@@ -1372,13 +1417,23 @@
 
   async function avecCerbere(action) {
     if (!$("optMask").checked || (cerbereOk === S.version && !strict)) return action();
-    if (busy) { setStatus("Lecture du texte en cours, patientez un instant."); return; }
-    const direct = S.pages.every((p) => p.lines);
+    let attendu = false;
+    if (busy) { // lecture en cours : on attend qu'elle finisse, puis Cerbère vérifie
+      attendu = true;
+      setStatus("Lecture du texte en cours, Cerbère vérifie juste après…", true);
+      while (busy) await new Promise((r) => setTimeout(r, 300));
+    }
+    const direct = !attendu && S.pages.every((p) => p.lines);
     let items;
     try { setStatus("Cerbère vérifie ce qui reste visible…", true); items = await analyserCerbere(); }
     catch (e) { items = []; }
     setStatus("");
-    if (!items.length && direct && !strict) { cerbereOk = S.version; return action(); }
+    if (!items.length && direct && !strict) {
+      cerbereOk = S.version;
+      await action();
+      setStatus(($("status").textContent + " Cerbère n'a rien trouvé à signaler.").trim());
+      return;
+    }
     cerbereItems = items; cerbereSuite = action;
     closeSheet();
     $("cerbere").hidden = false; // sans voile sombre : l'image reste visible au-dessus
@@ -1466,7 +1521,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.4.3";
+  const VERSION_APP = "0.4.4";
   const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
   (function verifierVersion() {
     $("verVersion").textContent = VERSION_APP;

@@ -45,7 +45,7 @@
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
   <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
-  <p class="fineprint">Version 0.4.3 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.4.4 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -64,6 +64,10 @@
     <div class="tampon" id="tampon" hidden aria-hidden="true"></div>
     <p class="toast" id="toast" role="status" hidden></p>
     <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <div class="selbar" id="cropbar" hidden>
+      <button class="btn small primary" id="cropOk" type="button">Recadrer ici</button>
+      <button class="btn small" id="cropCancel" type="button" aria-label="Annuler le recadrage">✕</button>
+    </div>
     <div class="selbar" id="selbar" hidden>
       <button class="btn small dark" id="selMask" type="button">Masquer</button>
       <button class="btn small primary" id="selAll" type="button">Masquer tous les pareils</button>
@@ -79,6 +83,7 @@
 
   <div class="toolbar" role="radiogroup" aria-label="Outil">
     <label class="tool"><input type="radio" name="tool" value="move" id="toolMove"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacer</span></label>
+    <label class="tool"><input type="radio" name="tool" value="crop" id="toolCrop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span></label>
     <label class="tool"><input type="radio" name="tool" value="brush" id="toolBrush" checked><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c2.5 0 4.5-1 5-3.5l10-10-3-3-10 10C2.5 15 3 18 3 21zM14 5l5 5"/></svg><span>Pinceau</span></label>
     <label class="tool"><input type="radio" name="tool" value="rect" id="toolRect"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span>Rectangle</span></label>
     <label class="tool"><input type="radio" name="tool" value="erase" id="toolErase"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span></label>

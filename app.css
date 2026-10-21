@@ -152,7 +152,7 @@ input[type=text],select{
 .empty-inner{display:grid;gap:12px;width:min(100%,280px)}
 .toolbar{display:flex;gap:4px;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:4px}
 .tool{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;border-radius:9px;
-  font:600 .72rem var(--ui);color:var(--ink);background:none;border:0;cursor:pointer;padding:4px 2px}
+  font:600 .66rem var(--ui);color:var(--ink);background:none;border:0;cursor:pointer;padding:4px 1px}
 .tool input{position:absolute;opacity:0;pointer-events:none}
 .tool:has(input:checked){background:var(--accent);color:var(--accent-ink)}
 .tool:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
@@ -177,7 +177,7 @@ input[type=text],select{
 .selbar .btn{flex:1 1 auto}
 .btn.dark{background:#000;border-color:#000;color:#fff}
 .selbar{flex-wrap:nowrap}
-.selbar #selCancel{flex:0 0 auto;min-width:44px}
+.selbar #selCancel,.selbar #cropCancel{flex:0 0 auto;min-width:44px}
 .selbar .btn{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Cerbère */
