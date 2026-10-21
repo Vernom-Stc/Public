@@ -44,7 +44,8 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="fineprint">Version 0.3.5 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
+  <p class="fineprint">Version 0.3.6 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -145,6 +146,8 @@
 
     <div class="group">
       <button class="btn" id="btnCerbere" type="button">Vérifier avec Cerbère</button>
+      <label class="check"><input type="checkbox" id="optStrict"> Mode strict (professionnels)</label>
+      <p class="hint">En mode strict, chaque alerte de Cerbère doit être traitée, puis un aperçu final s'affiche avant tout envoi.</p>
       <p class="hint">Cerbère relit ce qui reste visible et signale ce qui pourrait encore vous trahir. Il vérifie aussi tout seul avant chaque envoi.</p>
     </div>
 
@@ -158,6 +161,7 @@
     <p id="cerbereIntro"></p>
     <ul class="cerbere-list" id="cerbereList"></ul>
     <p class="hint">Touchez un point pour le voir sur l'image. Cerbère ne masque rien tout seul : vous décidez.</p>
+    <p class="hint strict-note" id="cerbereStrictNote" hidden>Mode strict : traitez chaque point (Masquer ou Laisser) pour continuer.</p>
     <div class="cerbere-foot">
       <button class="btn" id="cerbereBack" type="button">Revenir</button>
       <button class="btn primary" id="cerbereSend" type="button">Envoyer</button>
@@ -165,12 +169,42 @@
   </section>
 </main>
 
+<!-- Aperçu final (mode strict) -->
+<section class="overlay" id="apercu" hidden aria-label="Aperçu final">
+  <div class="overlay-inner">
+    <h3>Aperçu final</h3>
+    <p class="hint">Voici exactement ce qui va partir. Vérifiez chaque page.</p>
+    <div class="apercu-pages" id="apercuPages"></div>
+    <label class="check"><input type="checkbox" id="apercuOk"> J'ai vérifié tout le document</label>
+    <div class="cerbere-foot">
+      <button class="btn" id="apercuBack" type="button">Revenir</button>
+      <button class="btn primary" id="apercuSend" type="button" disabled>Envoyer</button>
+    </div>
+  </div>
+</section>
+
+<!-- Vérification de la version, au premier lancement -->
+<section class="overlay" id="verif" hidden aria-label="Vérifiez votre version">
+  <div class="overlay-inner">
+    <h3>Vérifiez votre version de Kerckhoffs</h3>
+    <dl class="verif-list">
+      <dt>Version</dt><dd id="verVersion"></dd>
+      <dt>Vous l'utilisez depuis</dt><dd id="verOrigine"></dd>
+      <dt>Adresse officielle</dt><dd id="verOfficielle"></dd>
+    </dl>
+    <p>Les deux adresses doivent être identiques. Chaque version officielle est signée par l'auteur de Kerckhoffs : son numéro, son empreinte et sa signature sont publiés dans le fichier VERSIONS.md du dépôt officiel, et vérifiables avec n'importe quel portefeuille Bitcoin.</p>
+    <p class="hint">Une copie peut afficher ce même écran : la seule preuve, c'est la signature publiée à l'adresse officielle. En cas de doute, téléchargez Kerckhoffs à nouveau depuis l'adresse officielle.</p>
+    <button class="btn primary" id="verifOk" type="button">J'ai vérifié</button>
+  </div>
+</section>
+
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script src="vendor/jspdf/jspdf.umd.min.js"></script>
 <script src="vendor/tesseract/tesseract.min.js"></script>
 <script src="rules/registre.js"></script>
 <script src="rules/commun.js"></script>
 <script src="rules/cerbere.js"></script>
+<script src="rules/etiquettes.js"></script>
 <!-- Un fichier par pays : voir rules/LISEZMOI.md -->
 <script src="rules/pays/ch.js"></script>
 <script src="app.js"></script>

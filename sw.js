@@ -4,7 +4,7 @@
  * 2. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application.
  */
-const VERSION = "kerckhoffs-v0.3.5";
+const VERSION = "kerckhoffs-v0.3.6";
 const FILES = [
   "./",
   "index.html",
@@ -14,6 +14,7 @@ const FILES = [
   "rules/registre.js",
   "rules/commun.js",
   "rules/cerbere.js",
+  "rules/etiquettes.js",
   "rules/pays/ch.js",
   "icons/icon.svg",
   "icons/icon-180.png",

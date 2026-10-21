@@ -63,10 +63,24 @@ function tester(nom, regles) {
 }
 
 const paysFichiers = fs.readdirSync(path.join(racine, "rules/pays")).filter((f) => f.endsWith(".js") && !f.startsWith("_")).map((f) => "rules/pays/" + f);
-const K = charger(["rules/commun.js", "rules/cerbere.js", ...paysFichiers]);
+const K = charger(["rules/commun.js", "rules/cerbere.js", "rules/etiquettes.js", ...paysFichiers]);
 tester("Commun", K.commun);
 tester("Cerbère", K.cerbere.regles);
 if (!K.cerbere.sensibles.length) ko("Cerbère : la liste des mots sensibles est vide");
+console.log("Étiquettes");
+for (const e of K.etiquettes) {
+  const ex = e.exemples || {};
+  if (!ex.trouve || !ex.trouve.length) ko(`${e.id} : ajoutez au moins un exemple « trouve »`);
+  for (const [texte, attendu] of ex.trouve || []) {
+    const v = K.valeursApresEtiquettes(texte).map((x) => x.valeur);
+    if (!v.includes(attendu)) ko(`${e.id} : dans « ${texte} », la valeur attendue est « ${attendu} » (obtenu : ${v.length ? v.map((x) => "« " + x + " »").join(", ") : "rien"})`);
+  }
+  for (const texte of ex.ignore || []) {
+    const v = K.valeursApresEtiquettes(texte).filter((x) => x.etiquette.id === e.id);
+    if (v.length) ko(`${e.id} : « ${texte} » ne devrait rien donner (obtenu : « ${v[0].valeur} »)`);
+  }
+}
+console.log(`  ${K.etiquettes.length} groupe(s) d'étiquettes vérifié(s)`);
 for (const code of Object.keys(K.pays)) tester(`${K.pays[code].nom} (${code})`, K.pays[code].regles);
 
 // Le modèle doit rester valide, puisqu'on le copie.
@@ -76,7 +90,7 @@ for (const code of Object.keys(modele.pays)) tester("Modèle (_modele.js)", mode
 // Chaque pays doit être chargé par l'application et gardé pour le mode avion.
 console.log("Déclarations");
 const html = lire("index.html"), sw = lire("sw.js");
-for (const f of ["rules/registre.js", "rules/commun.js", "rules/cerbere.js", ...paysFichiers]) {
+for (const f of ["rules/registre.js", "rules/commun.js", "rules/cerbere.js", "rules/etiquettes.js", ...paysFichiers]) {
   if (!html.includes(`src="${f}"`)) ko(`${f} manque dans index.html`);
   if (!sw.includes(`"${f}"`)) ko(`${f} manque dans sw.js (liste FILES)`);
 }

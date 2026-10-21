@@ -202,3 +202,17 @@ input[type=text],select{
 .shutter{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #000;cursor:pointer}
 .shutter:active{transform:scale(.94)}
 .cam-note{color:#c9d3d9;font-size:.78rem;justify-self:end;text-align:right}
+
+/* aperçu final et vérification de version */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--paper);overflow-y:auto;
+  padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(20px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.overlay-inner{max-width:640px;margin:0 auto;display:grid;gap:14px}
+.overlay h3{margin:0;font-size:1.2rem}
+.overlay p{margin:0}
+.apercu-pages{display:grid;gap:10px}
+.apercu-pages img{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+.verif-list{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;background:var(--sheet);border:1px solid var(--line);border-radius:12px;padding:14px}
+.verif-list dt{font-weight:600;color:var(--muted);font-size:.88rem}
+.verif-list dd{margin:0;font-family:var(--mono);font-size:.9rem;overflow-wrap:anywhere}
+.strict-note{color:var(--warn)}

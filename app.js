@@ -691,6 +691,10 @@
           take(rr, m.index, m.index + m[0].length, r.type, v, r.type + "|" + v.replace(/[\s.]/g, "").toLowerCase(), bad ? "à relire" : null);
         }
       }
+      // Valeurs qui suivent une étiquette de formulaire (« Nom : », « Né le »…), voir rules/etiquettes.js
+      for (const v of K.valeursApresEtiquettes(raw)) {
+        take(rr, v.debut, v.fin, v.etiquette.type, v.valeur, v.etiquette.type + "|" + norm(v.valeur));
+      }
       for (const t of terms) {
         const needle = norm(t.needle || t.value);
         let from = 0, k;
@@ -983,6 +987,15 @@
           const mots = h.regle.id === "nom-titre" ? h.mots.slice(1) : h.mots; // on garde la civilité visible
           if (mots.length) ajouter({ tete: 1, label: h.regle.label, texte: mots.map((w) => w.text).join(" "), rects: rectsDe(mots) });
         });
+        // Tête 1 bis : valeur encore visible après une étiquette (« Nom : », « Né le »…)
+        if (visibles.length) {
+          let raw = ""; const rr = [];
+          visibles.forEach((w, i) => { if (i) raw += " "; rr.push([raw.length, raw.length + w.text.length]); raw += w.text; });
+          K.valeursApresEtiquettes(raw).forEach((v) => {
+            const mots = visibles.filter((w, i) => rr[i][0] < v.fin && rr[i][1] > v.debut);
+            if (mots.length) ajouter({ tete: 1, label: "Après l'étiquette « " + v.etiquette.mots[0] + " »", texte: v.valeur, rects: rectsDe(mots) });
+          });
+        }
         // Tête 3 : numéros, dates, adresses encore visibles
         chercher(detection, visibles).forEach((h) => ajouter({ tete: 3, label: "Encore visible : " + h.regle.type.toLowerCase(), texte: h.texte, rects: rectsDe(h.mots) }));
         // Tête 2 : mots sensibles (signalés, à laisser si l'IA en a besoin)
@@ -1024,7 +1037,9 @@
     $("cerbereIntro").textContent = restants.length
       ? `Cerbère a trouvé ${restants.length} point${restants.length > 1 ? "s" : ""} à vérifier dans ce qui reste visible.`
       : "Rien à signaler. Vous pouvez envoyer.";
-    $("cerbereSend").textContent = restants.length ? "Envoyer quand même" : "Envoyer";
+    $("cerbereSend").textContent = strict ? "Aperçu final" : (restants.length ? "Envoyer quand même" : "Envoyer");
+    $("cerbereSend").hidden = strict && restants.length > 0; // en mode strict : tout traiter d'abord
+    $("cerbereStrictNote").hidden = !(strict && restants.length > 0);
     cerbereItems.forEach((it, i) => {
       if (it.fait) return;
       const li = document.createElement("li");
@@ -1055,15 +1070,25 @@
     render();
   }
 
+  // Mode strict (professionnels) : chaque alerte doit être traitée, puis un aperçu final est obligatoire.
+  let strict = false;
+  try { strict = localStorage.getItem("kerckhoffs-strict") === "1"; } catch (e) {}
+  $("optStrict").checked = strict;
+  $("optStrict").addEventListener("change", () => {
+    strict = $("optStrict").checked;
+    try { localStorage.setItem("kerckhoffs-strict", strict ? "1" : "0"); } catch (e) {}
+    cerbereOk = -1;
+  });
+
   async function avecCerbere(action) {
-    if (!$("optMask").checked || cerbereOk === S.version) return action();
+    if (!$("optMask").checked || (cerbereOk === S.version && !strict)) return action();
     if (busy) { setStatus("Lecture du texte en cours, patientez un instant."); return; }
     const direct = S.pages.every((p) => p.lines);
     let items;
     try { setStatus("Cerbère vérifie ce qui reste visible…", true); items = await analyserCerbere(); }
     catch (e) { items = []; }
     setStatus("");
-    if (!items.length && direct) { cerbereOk = S.version; return action(); }
+    if (!items.length && direct && !strict) { cerbereOk = S.version; return action(); }
     cerbereItems = items; cerbereSuite = action;
     closeSheet();
     $("cerbere").hidden = false; // sans voile sombre : l'image reste visible au-dessus
@@ -1074,7 +1099,35 @@
   $("cerbereSend").addEventListener("click", () => {
     const suite = cerbereSuite;
     cerbereOk = S.version; fermerCerbere();
+    if (strict) { ouvrirApercu(suite); return; }
     if (suite) suite(); // appelé directement dans le toucher : le partage et la copie restent autorisés
+  });
+
+  // Aperçu final (mode strict) : exactement ce qui va partir, page par page.
+  let apercuSuite = null;
+  function ouvrirApercu(suite) {
+    apercuSuite = suite;
+    const box = $("apercuPages");
+    box.textContent = "";
+    const masked = $("optMask").checked, f = fmt();
+    S.pages.forEach((p) => {
+      let c = finalCanvas(p, masked);
+      if (f === "light") c = lighten(c);
+      const img = document.createElement("img");
+      img.src = c.toDataURL("image/jpeg", 0.8);
+      img.alt = "Aperçu de la page envoyée";
+      box.append(img);
+    });
+    $("apercuOk").checked = false;
+    $("apercuSend").disabled = true;
+    $("apercu").hidden = false;
+  }
+  $("apercuOk").addEventListener("change", () => { $("apercuSend").disabled = !$("apercuOk").checked; });
+  $("apercuBack").addEventListener("click", () => { $("apercu").hidden = true; cerbereOk = -1; });
+  $("apercuSend").addEventListener("click", () => {
+    $("apercu").hidden = true;
+    const suite = apercuSuite; apercuSuite = null;
+    if (suite) suite();
   });
   $("btnCerbere").addEventListener("click", () => { cerbereOk = -1; closeSheet(); avecCerbere(() => setStatus("Cerbère : rien d'autre à signaler.")); });
 
@@ -1121,6 +1174,23 @@
 
   $("goQuick").addEventListener("click", () => openWork("quick"));
   $("goFolder").addEventListener("click", () => openWork("folder"));
+
+  /* ------------------------- au premier lancement de chaque version : vérifier sa version */
+  const VERSION_APP = "0.3.6";
+  const ADRESSE_OFFICIELLE = ""; // sera remplie, et signée par l'auteur, pour la version officielle
+  (function verifierVersion() {
+    $("verVersion").textContent = VERSION_APP;
+    $("verOrigine").textContent = location.host || "fichier local";
+    $("verOfficielle").textContent = ADRESSE_OFFICIELLE || "pas encore publiée (ceci est une version de test, non signée)";
+    let vue = null;
+    try { vue = localStorage.getItem("kerckhoffs-version-vue"); } catch (e) {}
+    if (vue !== VERSION_APP) $("verif").hidden = false;
+    $("verifOk").addEventListener("click", () => {
+      $("verif").hidden = true;
+      try { localStorage.setItem("kerckhoffs-version-vue", VERSION_APP); } catch (e) {}
+    });
+    $("openVerif").addEventListener("click", () => { $("verif").hidden = false; });
+  })();
 
   /* ------------------------------------------------------ hors ligne */
   const st = $("offlineState");
