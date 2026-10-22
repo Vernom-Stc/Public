@@ -2,10 +2,11 @@
 
 *English below.*
 
-Chaque version officielle est signée par l'auteur de Kerckhoffs. Cette liste est la référence : si l'empreinte affichée dans votre application (« Vérifier ma version ») n'est pas celle de cette page, à l'adresse officielle, ce n'est pas une version officielle.
+Chaque version officielle est signée par l'auteur de Kerckhoffs. Cette liste est la référence : si le numéro de référence affiché dans votre application (« Vérifier ma version ») n'est pas celui de cette page, à l'adresse officielle, ce n'est pas une version officielle.
 
-| Version | Date | Empreinte de l'application | Version figée (SHA-256 du fichier) |
+| Version | Date | Numéro de référence | Version figée (SHA-256 du fichier) |
 |---|---|---|---|
+| 0.6.0 | 2026-10-22 | `2702-97AF-DC9D-2758` | `84327e786de2240b0e53f8fe3fbbeb364a3c4ac4290e871e06f5f819cf234fd1` |
 | 0.5.9 | 2026-10-21 | `5329-B2FA-298F-137D` | `2a5e10741c6d79f2893724ee1543aaf37c008111f5a9d86b397ccd702493209c` |
 | 0.5.8 | 2026-10-21 | `D9BB-229C-84C1-1B36` | `c0a569908d869cb7b4fc7360b8fbb5c828d6f09fadc802fad3fd0de1609a6551` |
 | 0.5.7 | 2026-10-21 | `AAA1-1089-F052-6C5D` | `7339eda53e525ea82e73ed0161c0124ca0318fd2a42015ed7f3920152cd7fbdf` |
@@ -43,7 +44,11 @@ Sans Node, avec les outils présents sur presque tous les ordinateurs :
 
 Les trois doivent répondre « OK » ou « Signature Verified Successfully ».
 
-L'empreinte de l'application est le début du SHA-256 de `empreintes.txt`, en quatre groupes.
+Le numéro de référence est le début du SHA-256 de `empreintes.txt`, en quatre groupes.
+
+## Les messages de l'auteur
+
+Toute communication de l'auteur est signée avec la même clé. Pour la vérifier : dans Kerckhoffs, « Vérifier ma version », puis « Vérifier un message de l'auteur ». Un message sans signature valide ne vient pas de l'auteur.
 
 ---
 

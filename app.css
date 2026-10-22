@@ -256,3 +256,6 @@ input[type=password]{width:100%;font:16px var(--ui);color:var(--ink);background:
 .verif-lien{margin:14px 0;padding:12px;border:1px solid #c9d1cf;border-radius:12px;text-align:center}
 .verif-lien .btn{display:inline-block;text-decoration:none}
 .verif-qr canvas{width:170px;height:auto;margin:6px auto;display:block}
+.verif-message{margin:14px 0;padding:10px 12px;border:1px solid #c9d1cf;border-radius:12px}
+.verif-message summary{cursor:pointer;font-weight:600}
+.verif-message textarea{width:100%;box-sizing:border-box;margin:8px 0;font:inherit;font-size:.85rem;border:1px solid #c9d1cf;border-radius:8px;padding:8px}

@@ -29,7 +29,7 @@ Ce téléphone devient une machine fermée : aucun moyen physique d'envoyer quoi
 
 ### Test 3 : la signature de l'auteur
 
-Touchez « Vérifier ma version » sur l'accueil. L'écran affiche une empreinte, par exemple `9A71-FC92-65A0-DC72`. Elle doit être identique à celle publiée pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
+Touchez « Vérifier ma version » sur l'accueil. L'écran affiche un numéro de référence, par exemple `9A71-FC92-65A0-DC72`. Il doit être identique à celui publié pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
 
 Cette version ne changera plus jamais toute seule, avec ou sans internet, tant que vous ne l'effacez pas. Si une nouvelle version existe, Kerckhoffs vous le signale ; c'est vous qui allez la chercher. Elle est alors vérifiée fichier par fichier avant de vous être proposée. Si quelqu'un d'autre que l'auteur a changé un seul octet, par exemple en prenant le contrôle du dépôt, la mise à jour est refusée et un bandeau rouge vous prévient.
 

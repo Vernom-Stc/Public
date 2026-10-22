@@ -59,5 +59,29 @@
     });
   }
 
-  window.KerckhoffsVerification = { verifier, verifierCopie, CLE_AUTEUR };
+  // Les messages de l'auteur (annonces, adresse des dons…) sont signés avec la même clé que les versions.
+  // Format :
+  //   -----DÉBUT MESSAGE KERCKHOFFS-----
+  //   le texte
+  //   -----SIGNATURE-----
+  //   la signature en base64
+  //   -----FIN-----
+  // Le texte est d'abord « nettoyé » de la même façon qu'à la signature (outils/signer-message.mjs),
+  // pour qu'un copier-coller qui ajoute des espaces en début ou en fin de ligne ou change les retours à la ligne ne gêne pas.
+  function nettoyer(t) {
+    return String(t).normalize("NFC").replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/^[ \t\u00a0]+|[ \t\u00a0]+$/g, "")).join("\n").replace(/^\n+|\n+$/g, "");
+  }
+  function verifierMessage(bloc) {
+    const m = String(bloc).replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/^[ \t\u00a0]+|[ \t\u00a0]+$/g, "")).join("\n").match(/-----DÉBUT MESSAGE KERCKHOFFS-----\n([\s\S]*?)\n-----SIGNATURE-----\n([A-Za-z0-9+\/=\s]+?)\n?-----FIN-----/);
+    if (!m) return { ok: false, raison: "Le message n'est pas complet. Copiez-le de « DÉBUT » à « FIN »." };
+    try {
+      const texte = new TextEncoder().encode(nettoyer(m[1]));
+      const sig = octets(m[2].replace(/\s+/g, ""));
+      if (sig.length !== 64) return { ok: false, raison: "La signature est abîmée." };
+      return nacl.sign.detached.verify(texte, sig, octets(CLE_AUTEUR))
+        ? { ok: true } : { ok: false, raison: "Le texte a été modifié, ou il ne vient pas de l'auteur." };
+    } catch (e) { return { ok: false, raison: "La signature est illisible." }; }
+  }
+
+  window.KerckhoffsVerification = { verifier, verifierCopie, verifierMessage, nettoyer, CLE_AUTEUR };
 })();

@@ -1692,7 +1692,7 @@
   $("goFolder").addEventListener("click", () => openWork("folder"));
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.5.9";
+  const VERSION_APP = "0.6.0";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
@@ -1713,6 +1713,13 @@
       try { localStorage.setItem("kerckhoffs-version-vue", VERSION_APP); } catch (e) {}
     });
     $("openVerif").addEventListener("click", () => { $("verif").hidden = false; });
+    // Un message de l'auteur : vérifié ici, avec la clé publique inscrite dans verification.js, sans internet.
+    $("msgVerifier").addEventListener("click", () => {
+      const r = window.KerckhoffsVerification.verifierMessage($("msgSigne").value);
+      const el = $("msgResultat");
+      el.textContent = r.ok ? `Signé par l'auteur ✓ Ce message est authentique et n'a pas été modifié.` : `NON signé par l'auteur : ${r.raison}`;
+      el.className = "empreinte " + (r.ok ? "ok" : "ko");
+    });
   })();
 
   /* ------------------------------------------------------ hors ligne et mises à jour */
@@ -1809,7 +1816,7 @@
     b.classList.toggle("danger", !!o.danger);
     $("majTexte").textContent = texte;
     $("majEmpreinte").hidden = !o.empreinte;
-    $("majEmpreinte").textContent = o.empreinte ? "Empreinte : " + o.empreinte : "";
+    $("majEmpreinte").textContent = o.empreinte ? "Numéro de référence : " + o.empreinte : "";
     actionBandeau = o.faire || null;
     $("majOk").hidden = !o.action;
     $("majOk").textContent = o.action || "";

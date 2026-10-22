@@ -51,8 +51,8 @@
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.5.9.html" download>Version figée, pour les usages sensibles</a></p>
-  <p class="fineprint">Version 0.5.9 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.6.0.html" download>Version figée, pour les usages sensibles</a></p>
+  <p class="fineprint">Version 0.6.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
@@ -279,9 +279,9 @@
       <dt>Version</dt><dd id="verVersion"></dd>
       <dt>Vous l'utilisez depuis</dt><dd id="verOrigine"></dd>
       <dt>Adresse officielle</dt><dd id="verOfficielle"></dd>
-      <dt>Empreinte</dt><dd id="verEmpreinte" class="empreinte">calcul…</dd>
+      <dt>Numéro de référence</dt><dd id="verEmpreinte" class="empreinte">calcul…</dd>
     </dl>
-    <p>Les deux adresses doivent être identiques, et l'empreinte doit être la même que celle publiée pour cette version dans VERSIONS.md, à l'adresse officielle. Chaque version officielle est signée par l'auteur de Kerckhoffs.</p>
+    <p>Les deux adresses doivent être identiques, et le numéro de référence doit être le même que celui publié pour cette version, à l'adresse officielle. Chaque version officielle est signée par l'auteur de Kerckhoffs.</p>
     <p><strong>Votre version ne change jamais toute seule.</strong> Celle que vous vérifiez maintenant reste exactement la même, avec ou sans internet, tant que vous ne l'effacez pas. Si une nouvelle version existe, Kerckhoffs vous le dit, c'est tout : c'est vous qui allez la chercher, quand vous voulez. Elle est alors vérifiée avant de vous être proposée, et refusée si elle n'est pas signée.</p>
     <div class="verif-lien" id="verLienBloc">
       <a class="btn" id="lienVersions" target="_blank" rel="noopener noreferrer">Ouvrir la liste officielle des versions</a>
@@ -289,6 +289,13 @@
       <div class="verif-qr" id="qrVersions"></div>
       <p class="hint">Encore plus sûr : scannez ce code avec un <strong>autre</strong> téléphone ou un ordinateur. Kerckhoffs ne se connecte pas : ce lien ouvre seulement votre navigateur.</p>
     </div>
+    <details class="verif-message" id="msgBloc">
+      <summary>Vérifier un message de l'auteur</summary>
+      <p class="hint">Toute communication officielle de l'auteur est signée avec son sceau. Collez ici le message entier, de « DÉBUT » à « FIN » : Kerckhoffs vérifie, sans internet, qu'il vient bien de l'auteur et qu'aucun mot n'a été changé.</p>
+      <textarea id="msgSigne" rows="6" placeholder="-----DÉBUT MESSAGE KERCKHOFFS-----"></textarea>
+      <button class="btn" id="msgVerifier" type="button">Vérifier le message</button>
+      <p class="empreinte" id="msgResultat" role="status"></p>
+    </details>
     <p class="hint">Une fausse copie pourrait afficher ce même écran, avec un faux lien. Le plus sûr reste de connaître l'adresse officielle par un autre moyen : un favori, ou quelqu'un de confiance. Pour les usages sensibles, il existe aussi un fichier signé qui ne se met jamais à jour tout seul.</p>
     <button class="btn primary" id="verifOk" type="button">J'ai vérifié</button>
   </div>
