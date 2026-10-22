@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Verrou : cette page ne peut rien charger ni rien envoyer. Elle fonctionne entièrement sur votre ordinateur. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Le sceau de Kerckhoffs</title>
+<style>
+  :root { --bleu:#002366; --fond:#f4f6f8; --carte:#fff; --texte:#14202b; --gris:#5b6770; --ok:#1b6e3a; --ko:#a4161a; --bord:#c9d1cf; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fond); color:var(--texte); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { color:var(--bleu); font-size:1.6rem; margin:0 0 4px; }
+  h2 { color:var(--bleu); font-size:1.2rem; margin:0 0 8px; }
+  .carte { background:var(--carte); border:1px solid var(--bord); border-radius:14px; padding:18px; margin:16px 0; }
+  .alerte { border-left:5px solid var(--ko); }
+  .hint { color:var(--gris); font-size:.9rem; }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input[type=password], input[type=text], textarea { width:100%; font:inherit; padding:10px; border:1px solid var(--bord); border-radius:10px; }
+  textarea { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.85rem; }
+  button { font:inherit; font-weight:600; border-radius:10px; padding:10px 16px; border:1px solid var(--bleu); background:#fff; color:var(--bleu); cursor:pointer; margin:10px 8px 0 0; }
+  button.primaire { background:var(--bleu); color:#fff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .resultat { font-family:ui-monospace, Menlo, Consolas, monospace; word-break:break-all; background:var(--fond); border-radius:10px; padding:10px; margin-top:10px; }
+  .ok { color:var(--ok); font-weight:600; } .ko { color:var(--ko); font-weight:600; }
+  .onglets { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+  .onglets button { margin:0; }
+  .onglets button[aria-selected=true] { background:var(--bleu); color:#fff; }
+  ol li { margin:4px 0; }
+  #papier { display:none; }
+  @media print {
+    body { background:#fff; } main > *:not(#papier) { display:none !important; }
+    #papier { display:block !important; text-align:center; } #papier img { width:9cm; image-rendering:pixelated; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Le sceau de Kerckhoffs</h1>
+  <p class="hint">Cette page fonctionne sans internet. Coupez le wifi avant de commencer. Rien de ce que vous faites ici ne quitte votre ordinateur.</p>
+
+  <div class="carte alerte">
+    <strong>Le sceau, c'est le pouvoir sur Kerckhoffs.</strong> Celui qui le possède, avec son mot de passe, peut publier une version que tous les téléphones accepteront.
+    Ne l'envoyez jamais à personne, ne le mettez jamais en ligne. Gardez-le sur vos clés USB, et sa copie papier à part.
+  </div>
+
+  <div class="onglets" role="tablist">
+    <button role="tab" aria-selected="true" data-vue="creer">1. Créer le sceau</button>
+    <button role="tab" aria-selected="false" data-vue="controler">2. Contrôler une clé USB</button>
+    <button role="tab" aria-selected="false" data-vue="signer">3. Signer</button>
+  </div>
+
+  <!-- 1. Créer -->
+  <section class="carte" id="vue-creer">
+    <h2>Créer le sceau, une seule fois</h2>
+    <ol class="hint">
+      <li>Choisissez un mot de passe long (une phrase de plusieurs mots).</li>
+      <li>La page fabrique le sceau, chiffré par ce mot de passe.</li>
+      <li>Enregistrez le fichier du sceau sur chacune de vos clés USB, et imprimez la copie papier.</li>
+      <li>Envoyez seulement la clé publique : c'est le « dessin » du sceau, il n'y a aucun risque.</li>
+    </ol>
+    <label for="mdp1">Mot de passe du sceau</label>
+    <input type="password" id="mdp1" autocomplete="new-password">
+    <label for="mdp2">Le même, une deuxième fois</label>
+    <input type="password" id="mdp2" autocomplete="new-password">
+    <p class="hint" id="mdpAvis">Au moins 20 caractères. Si vous oubliez ce mot de passe, le sceau est perdu : notez-le sur papier, rangé loin des clés USB.</p>
+    <button class="primaire" id="creer" disabled>Créer le sceau</button>
+    <div id="creeBloc" hidden>
+      <p class="ok">Le sceau est créé.</p>
+      <button id="dlSceau">Enregistrer le fichier du sceau</button>
+      <button id="imprimer">Imprimer la copie papier</button>
+      <p class="hint">Enregistrez le fichier <code>sceau-kerckhoffs.json</code> sur chaque clé USB. Puis utilisez l'onglet 2 pour contrôler que chaque clé s'ouvre.</p>
+      <h2 style="margin-top:18px">La clé publique, à envoyer</h2>
+      <div class="resultat" id="clePub"></div>
+      <button id="copierPub">Copier la clé publique</button>
+      <button id="dlPub">Enregistrer cle-publique.pem</button>
+    </div>
+  </section>
+
+  <!-- 2. Contrôler -->
+  <section class="carte" id="vue-controler" hidden>
+    <h2>Contrôler qu'une clé USB s'ouvre</h2>
+    <p class="hint">À faire juste après la création, sur chaque clé USB, puis une fois par an.</p>
+    <label for="fichierCtrl">Fichier du sceau (sur la clé USB)</label>
+    <input type="file" id="fichierCtrl" accept=".json,application/json">
+    <label for="mdpCtrl">Mot de passe du sceau</label>
+    <input type="password" id="mdpCtrl" autocomplete="current-password">
+    <button class="primaire" id="controler">Contrôler</button>
+    <p id="ctrlResultat" role="status"></p>
+  </section>
+
+  <!-- 3. Signer -->
+  <section class="carte" id="vue-signer" hidden>
+    <h2>Signer une version ou un message</h2>
+    <label for="fichierSig">Fichier du sceau (sur la clé USB)</label>
+    <input type="file" id="fichierSig" accept=".json,application/json">
+    <label for="mdpSig">Mot de passe du sceau</label>
+    <input type="password" id="mdpSig" autocomplete="current-password">
+    <button class="primaire" id="ouvrir">Ouvrir le sceau</button>
+    <p id="ouvertInfo" role="status"></p>
+
+    <div id="signerBloc" hidden>
+      <h2 style="margin-top:18px">Signer des fichiers (une nouvelle version)</h2>
+      <p class="hint">Choisissez les fichiers préparés pour la version, par exemple <code>empreintes.txt</code> et <code>kerckhoffs-x.y.z.html</code>. Pour chacun, la page enregistre sa signature (<code>.sig</code>). Les signatures sont publiques : vous pouvez les envoyer sans risque.</p>
+      <input type="file" id="fichiersAsigner" multiple>
+      <div id="sigListe"></div>
+
+      <h2 style="margin-top:18px">Signer un message</h2>
+      <textarea id="message" rows="6" placeholder="Votre annonce, l'adresse des dons…"></textarea>
+      <button id="signerMessage">Signer le message</button>
+      <textarea id="messageSigne" rows="8" readonly hidden></textarea>
+      <button id="copierMessage" hidden>Copier le message signé</button>
+
+      <p><button id="fermer">Fermer le sceau</button></p>
+    </div>
+  </section>
+
+  <!-- Copie papier (visible seulement à l'impression) -->
+  <section id="papier">
+    <h1>Sceau de Kerckhoffs : copie papier</h1>
+    <p>Ce QR code contient le sceau <strong>chiffré</strong>. Il ne sert à rien sans le mot de passe.<br>Pour le restaurer : scannez-le, enregistrez le texte obtenu dans un fichier <code>sceau-kerckhoffs.json</code>.</p>
+    <img id="papierQR" alt="">
+    <p id="papierEmpreinte"></p>
+    <p>Rangez cette feuille loin des clés USB et loin du mot de passe.</p>
+  </section>
+</main>
+
+<!-- Bibliothèques (copiées telles quelles depuis vendor/) -->
+<script src="../vendor/tweetnacl/nacl.min.js"></script>
+<script src="../vendor/qrcode/qrcode.js"></script>
+<script>
+"use strict";
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const ITERATIONS = 600000;
+  const enc = new TextEncoder();
+  const b64 = (u) => btoa(String.fromCharCode(...new Uint8Array(u)));
+  const deb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const hex = (u) => [...new Uint8Array(u)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  // La clé publique au format standard (SPKI, Ed25519), lisible par openssl et par outils/verifier.mjs.
+  const ENTETE_SPKI = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
+  const pem = (pub) => {
+    const der = new Uint8Array(44); der.set(ENTETE_SPKI); der.set(pub, 12);
+    return "-----BEGIN PUBLIC KEY-----\n" + b64(der) + "\n-----END PUBLIC KEY-----\n";
+  };
+  const empreintePub = async (pub) => hex(await crypto.subtle.digest("SHA-256", pub)).slice(0, 16).toUpperCase().match(/.{4}/g).join("-");
+
+  function telecharger(nom, contenu, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([contenu], { type: type || "application/octet-stream" }));
+    a.download = nom; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  async function cleDeMotDePasse(mdp, sel) {
+    const base = await crypto.subtle.importKey("raw", enc.encode(mdp.normalize("NFC")), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: sel, iterations: ITERATIONS }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function ouvrirSceau(fichier, mdp) {
+    if (!fichier) throw new Error("Choisissez le fichier du sceau.");
+    let o;
+    try { o = JSON.parse(await fichier.text()); } catch (e) { throw new Error("Ce fichier n'est pas un sceau de Kerckhoffs."); }
+    if (o["kerckhoffs-sceau"] !== 1) throw new Error("Ce fichier n'est pas un sceau de Kerckhoffs.");
+    const pub = deb64(o.cle_publique);
+    let graine;
+    try {
+      const k = await cleDeMotDePasse(mdp, deb64(o.sel));
+      graine = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: deb64(o.iv), additionalData: pub }, k, deb64(o.chiffre)));
+    } catch (e) { throw new Error("Mot de passe incorrect, ou fichier abîmé."); }
+    const paire = nacl.sign.keyPair.fromSeed(graine);
+    graine.fill(0);
+    if (b64(paire.publicKey) !== o.cle_publique) throw new Error("Le sceau ne correspond pas à sa clé publique : fichier abîmé.");
+    return { paire, pub };
+  }
+
+  // Onglets
+  document.querySelectorAll("[data-vue]").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("[data-vue]").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    ["creer", "controler", "signer"].forEach((v) => { $("vue-" + v).hidden = v !== b.dataset.vue; });
+  }));
+
+  // 1. Créer
+  let sceauJSON = null, pubCree = null;
+  const majMdp = () => {
+    const a = $("mdp1").value, b = $("mdp2").value;
+    let avis = "Au moins 20 caractères. Si vous oubliez ce mot de passe, le sceau est perdu : notez-le sur papier, rangé loin des clés USB.";
+    if (a.length && a.length < 20) avis = `Encore ${20 - a.length} caractère(s) au minimum.`;
+    else if (a.length >= 20 && b && a !== b) avis = "Les deux mots de passe ne sont pas identiques.";
+    else if (a.length >= 20 && a === b) avis = "C'est bon.";
+    $("mdpAvis").textContent = avis;
+    $("creer").disabled = !(a.length >= 20 && a === b);
+  };
+  $("mdp1").addEventListener("input", majMdp); $("mdp2").addEventListener("input", majMdp);
+  $("creer").addEventListener("click", async () => {
+    $("creer").disabled = true; $("creer").textContent = "Création…";
+    const graine = crypto.getRandomValues(new Uint8Array(32)); // le hasard du système, le meilleur disponible
+    const paire = nacl.sign.keyPair.fromSeed(graine);
+    const sel = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const k = await cleDeMotDePasse($("mdp1").value, sel);
+    const chiffre = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: paire.publicKey }, k, graine);
+    graine.fill(0); paire.secretKey.fill(0);
+    pubCree = paire.publicKey;
+    sceauJSON = JSON.stringify({ "kerckhoffs-sceau": 1, kdf: "PBKDF2-SHA256", iterations: ITERATIONS, sel: b64(sel), iv: b64(iv), chiffre: b64(chiffre), cle_publique: b64(pubCree) });
+    $("mdp1").value = ""; $("mdp2").value = "";
+    const emp = await empreintePub(pubCree);
+    $("clePub").textContent = `${b64(pubCree)}\n\nEmpreinte de la clé : ${emp}`;
+    $("papierEmpreinte").textContent = `Clé publique : ${b64(pubCree)} · empreinte ${emp}`;
+    const qr = qrcode(0, "M"); qr.addData(sceauJSON, "Byte"); qr.make();
+    $("papierQR").src = qr.createDataURL(8, 16);
+    $("creeBloc").hidden = false; $("creer").textContent = "Sceau créé";
+  });
+  $("dlSceau").addEventListener("click", () => telecharger("sceau-kerckhoffs.json", sceauJSON, "application/json"));
+  $("imprimer").addEventListener("click", () => window.print());
+  $("copierPub").addEventListener("click", () => navigator.clipboard && navigator.clipboard.writeText(b64(pubCree)));
+  $("dlPub").addEventListener("click", () => telecharger("cle-publique.pem", pem(pubCree), "application/x-pem-file"));
+
+  // 2. Contrôler
+  $("controler").addEventListener("click", async () => {
+    const el = $("ctrlResultat"); el.className = ""; el.textContent = "Contrôle…";
+    try {
+      const { paire, pub } = await ouvrirSceau($("fichierCtrl").files[0], $("mdpCtrl").value);
+      paire.secretKey.fill(0);
+      el.textContent = `Ce sceau s'ouvre correctement ✓ Empreinte de la clé : ${await empreintePub(pub)}`; el.className = "ok";
+    } catch (e) { el.textContent = e.message; el.className = "ko"; }
+    $("mdpCtrl").value = "";
+  });
+
+  // 3. Signer
+  let ouvert = null;
+  $("ouvrir").addEventListener("click", async () => {
+    const el = $("ouvertInfo"); el.className = ""; el.textContent = "Ouverture…";
+    try {
+      ouvert = await ouvrirSceau($("fichierSig").files[0], $("mdpSig").value);
+      el.textContent = `Sceau ouvert ✓ Empreinte de la clé : ${await empreintePub(ouvert.pub)}`; el.className = "ok";
+      $("signerBloc").hidden = false;
+    } catch (e) { el.textContent = e.message; el.className = "ko"; }
+    $("mdpSig").value = "";
+  });
+  $("fichiersAsigner").addEventListener("change", async (e) => {
+    if (!ouvert) return;
+    const liste = $("sigListe"); liste.textContent = "";
+    for (const f of e.target.files) {
+      const sig = nacl.sign.detached(new Uint8Array(await f.arrayBuffer()), ouvert.paire.secretKey);
+      telecharger(f.name + ".sig", sig);
+      const p = document.createElement("p"); p.className = "ok"; p.textContent = `${f.name} signé ✓ (${f.name}.sig enregistré)`;
+      liste.appendChild(p);
+    }
+    e.target.value = "";
+  });
+  // Le même nettoyage que dans l'application (verification.js) et outils/signer-message.mjs.
+  const nettoyer = (t) => String(t).normalize("NFC").replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/^[ \t ]+|[ \t ]+$/g, "")).join("\n").replace(/^\n+|\n+$/g, "");
+  $("signerMessage").addEventListener("click", () => {
+    if (!ouvert) return;
+    const texte = nettoyer($("message").value);
+    if (!texte) return;
+    if (/-----/.test(texte)) { $("messageSigne").hidden = false; $("messageSigne").value = "Le message ne doit pas contenir « ----- »."; return; }
+    const sig = nacl.sign.detached(enc.encode(texte), ouvert.paire.secretKey);
+    $("messageSigne").value = `-----DÉBUT MESSAGE KERCKHOFFS-----\n${texte}\n-----SIGNATURE-----\n${b64(sig)}\n-----FIN-----`;
+    $("messageSigne").hidden = false; $("copierMessage").hidden = false;
+  });
+  $("copierMessage").addEventListener("click", () => navigator.clipboard && navigator.clipboard.writeText($("messageSigne").value));
+  $("fermer").addEventListener("click", () => {
+    if (ouvert) ouvert.paire.secretKey.fill(0);
+    ouvert = null; $("signerBloc").hidden = true; $("ouvertInfo").textContent = "Sceau fermé."; $("ouvertInfo").className = "";
+    $("message").value = ""; $("messageSigne").value = ""; $("messageSigne").hidden = true; $("copierMessage").hidden = true; $("sigListe").textContent = "";
+  });
+  window.addEventListener("beforeunload", () => { if (ouvert) ouvert.paire.secretKey.fill(0); });
+})();
+</script>
+</body>
+</html>

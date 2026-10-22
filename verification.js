@@ -15,7 +15,7 @@
 (function () {
   "use strict";
   // Clé publique de l'auteur (Ed25519). Elle est aussi dans cle-publique.pem, à la racine du dépôt.
-  const CLE_AUTEUR = "/44lBhocuJTz9+toJw/w7GyAuXZIOF8HxrwVYryw9EQ=";
+  const CLE_AUTEUR = "dN1LqN06mX2B2zB4u78bZFF9iSRQLWOpGTmHW6PUZR0=";
 
   const octets = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
