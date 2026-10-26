@@ -1,0 +1,15 @@
+# Bloque toute modification qui ajouterait un accès à internet au code de Kerckhoffs.
+# Le contrôle lui-même est dans outils/controle.sh : le même script tourne ici et avant chaque envoi d'une version.
+name: Sans internet
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verifier:
+    runs-on: codeberg-tiny
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sans internet, verrous en place, signé par l'auteur
+        run: bash outils/controle.sh

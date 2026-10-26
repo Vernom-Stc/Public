@@ -6,15 +6,25 @@ Kerckhoffs efface les informations personnelles d'une photo ou d'un document ava
 
 *English summary below.*
 
-## Deux façons de l'utiliser
+## Comment l'utiliser
 
-**Photo rapide.** Une diapo de cours, un tableau blanc, une photo de groupe. Effacez au doigt un nom, un visage ou un logo, copiez, collez dans l'IA.
+**Photographiez un document**, ou **importez-le** : une photo déjà prise, une image ou un PDF, une ou plusieurs pages. Kerckhoffs repère tout seul les noms et les numéros. Un nom devient `[PERSONNE_1]`, un numéro AVS devient `[AVS_1]`. Vous relisez, vous complétez au doigt (pinceau ou rectangle), puis vous envoyez en image, en PDF, en image allégée ou en texte seul. Vous lisez la réponse de l'IA avec votre original sous les yeux : vous savez qui est qui.
 
-**Dossier.** Plusieurs pages, détection automatique des noms et numéros, puis export en PDF, en image allégée ou en texte seul. Un nom devient `[PERSONNE_1]`, un numéro AVS devient `[AVS_1]`. Vous lisez la réponse de l'IA avec votre original sous les yeux : vous savez qui est qui.
+Tant que le document n'est pas validé, l'écran affiche en filigrane « ORIGINAL · NON MASQUÉ · NE PAS ENVOYER ».
 
-**Cerbère**, le gardien à trois têtes, relit avant chaque envoi ce qui reste visible et signale ce qui pourrait encore vous trahir : un nom après « Monsieur », un mot sensible, un code-barres, une date oubliée. Il propose, vous décidez. Ses règles sont dans `rules/cerbere.js`.
+**Remove Before Flight**, le contrôle avant envoi, relit ce qui reste visible et signale ce qui pourrait encore vous identifier : un nom après « Monsieur », un mot sensible, un code-barres, une date oubliée, ce qui a la forme d'un identifiant, et les zones d'écriture que la lecture n'a pas su lire (texte minuscule, flou ou manuscrit), en orange. Il prévient aussi quand plusieurs informations restent visibles ensemble (un code postal, un âge, le sexe, une information de santé) : réunies, elles suffisent souvent à retrouver quelqu'un. Il propose, vous décidez. Ses règles sont dans `rules/cerbere.js`.
 
-Dans les deux cas, vous pouvez aussi **alléger** l'image sans rien masquer : elle sera plus légère à envoyer et contiendra moins d'informations inutiles.
+**Pour aller plus loin dans la détection :**
+- **Les identifiants sont reconnus à leur forme**, dans n'importe quel pays : lettres et chiffres mêlés, groupes de chiffres, séparateurs répétés (voir `K.formeIdentifiant` dans `rules/registre.js`). Une forme très typique est masquée d'office, une forme douteuse est signalée.
+- **« Tous les pareils »** cherche séparément chaque information de la zone encadrée, et montre ce qu'il a trouvé : on passe de l'un à l'autre avec les flèches ‹ ›.
+- **« Rechercher ici »** relit de près la zone affichée, sur la photo en pleine résolution : utile pour les petits caractères.
+- **Le dernier balayage** cherche partout ce qui a déjà été masqué une fois. Il est automatique en mode strict.
+
+Après la validation, une courte animation montre les zones masquées qui tombent comme du sable : ce qui est masqué n'existe plus. Elle se coupe d'un toucher, sur l'écran de travail, et disparaît d'elle-même si le téléphone est réglé pour réduire les animations.
+
+**Le mode strict**, pour les professionnels, rend cette vérification obligatoire : chaque point doit être traité, puis un aperçu final montre exactement ce qui va partir.
+
+**La mention en bas du document.** Chaque document envoyé porte en bas une petite bande : « Masqué avec Kerckhoffs · non contrôlé en mode strict », ou « … contrôlé en mode strict ». Seul un document contrôlé en mode strict peut partir sans cette mention. Elle ne contient ni date, ni appareil, ni numéro.
 
 ## Pourquoi vous pouvez lui faire confiance
 
@@ -23,7 +33,7 @@ Lisez [CONFIANCE.md](CONFIANCE.md) ([English: TRUST.md](TRUST.md)). En bref :
 - **Faites le test du mode avion** : Kerckhoffs fonctionne entièrement sans connexion.
 - **Double verrou** : la page interdit au navigateur de contacter un autre site (règle de sécurité CSP), et le service worker refuse toute requête vers l'extérieur.
 - **Tout le code est public**, y compris les bibliothèques utilisées, copiées dans `vendor/`.
-- **Un contrôle automatique** bloque toute modification qui ajouterait un accès à internet (`.github/workflows/sans-internet.yml`).
+- **Un contrôle automatique** bloque toute modification qui ajouterait un accès à internet (`outils/controle.sh`, lancé avant chaque envoi d'une version et par `.forgejo/workflows/sans-internet.yml`).
 - **Chaque version est signée** par l'auteur, et l'application refuse toute mise à jour non signée. Pour les usages sensibles, une **version figée** en un seul fichier signé ne se met jamais à jour toute seule. Voir [VERSIONS.md](VERSIONS.md).
 
 ## Ce que Kerckhoffs ne fait pas à votre place
@@ -32,7 +42,7 @@ La détection automatique peut rater un élément, surtout sur une photo floue o
 
 ## Utiliser Kerckhoffs
 
-Ouvrez l'adresse web de Kerckhoffs (GitHub Pages) sur votre téléphone. Une fois la page chargée, elle reste disponible hors ligne. Vous pouvez l'ajouter à votre écran d'accueil (« Ajouter à l'écran d'accueil » dans le menu du navigateur).
+Ouvrez l'adresse officielle de Kerckhoffs, **kerckhoffs.app**, sur votre téléphone. Le code est publié sur Codeberg, une association à but non lucratif basée à Berlin : codeberg.org/kerckhoffs-1883/kerckhoffs. Une fois la page chargée, elle reste disponible hors ligne. Vous pouvez l'ajouter à votre écran d'accueil (« Ajouter à l'écran d'accueil » dans le menu du navigateur).
 
 Pour la lancer sur votre ordinateur :
 
@@ -70,4 +80,4 @@ Le nom rend hommage à Auguste Kerckhoffs, qui écrivait en 1883 dans *La Crypto
 
 ## English summary
 
-Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Use **Quick photo** to erase anything with your finger and paste the image into an AI, or **Folder** for multi-page documents with automatic detection of names and numbers, exported as PDF, lightened image or plain text. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the Apache 2.0 license; copy and adapt it freely. To add your country's rules, see [rules/LISEZMOI.md](rules/LISEZMOI.md).
+Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Take a photo or import a document (image or PDF, one or more pages): names and numbers are detected automatically, you finish with your finger, then export as image, PDF, lightened image or plain text. A check before sending flags what could still identify someone; strict mode, for professionals, makes it mandatory. Exports carry a small footer, “Masqué avec Kerckhoffs”, stating whether strict mode was used; only strict-mode documents may omit it. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the Apache 2.0 license; copy and adapt it freely. To add your country's rules, see [rules/LISEZMOI.md](rules/LISEZMOI.md).

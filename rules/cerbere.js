@@ -7,6 +7,7 @@
  *   regles    : formes à signaler (format : voir rules/registre.js, avec des exemples testés)
  *   sensibles : mots qui révèlent une situation personnelle. { mot, exact } :
  *               exact = true -> respecter les majuscules (« AI » oui, « ai » du verbe avoir non)
+ *               sante = true -> une information de santé : avec un code postal, un âge ou le sexe, elle peut identifier quelqu'un
  *
  * Chacun peut compléter ces listes dans sa propre copie.
  */
@@ -40,10 +41,10 @@ Kerckhoffs.ajouterCerbere({
     }
   ],
   sensibles: [
-    { mot: "AI", exact: true }, { mot: "invalidité" }, { mot: "maladie" }, { mot: "malade" },
-    { mot: "diagnostic" }, { mot: "traitement" }, { mot: "médicament" }, { mot: "hospitalisation" },
-    { mot: "hôpital" }, { mot: "psychiatre" }, { mot: "psychiatrique" }, { mot: "thérapie" },
-    { mot: "handicap" }, { mot: "grossesse" }, { mot: "accident" }, { mot: "incapacité" },
+    { mot: "AI", exact: true, sante: true }, { mot: "invalidité", sante: true }, { mot: "maladie", sante: true }, { mot: "malade", sante: true },
+    { mot: "diagnostic", sante: true }, { mot: "traitement", sante: true }, { mot: "médicament", sante: true }, { mot: "hospitalisation", sante: true },
+    { mot: "hôpital", sante: true }, { mot: "psychiatre", sante: true }, { mot: "psychiatrique", sante: true }, { mot: "thérapie", sante: true },
+    { mot: "handicap", sante: true }, { mot: "grossesse", sante: true }, { mot: "accident", sante: true }, { mot: "incapacité", sante: true },
     { mot: "salaire" }, { mot: "revenu" }, { mot: "dette" }, { mot: "dettes" }, { mot: "poursuite" },
     { mot: "poursuites" }, { mot: "faillite" }, { mot: "chômage" }, { mot: "licenciement" },
     { mot: "aide sociale" }, { mot: "casier" }, { mot: "condamnation" }, { mot: "plainte" },

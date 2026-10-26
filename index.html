@@ -26,42 +26,44 @@
   </header>
 
   <div class="choices">
-    <button class="choice" id="goQuick" type="button">
-      <span class="choice-title">Photo rapide</span>
-      <span class="choice-text">Une image. Effacez au doigt ce que vous voulez cacher, copiez, collez dans l'IA.</span>
-    </button>
-    <button class="choice" id="goFolder" type="button">
-      <span class="choice-title">Dossier</span>
-      <span class="choice-text">Plusieurs pages, détection automatique des noms et numéros, export en PDF, image allégée ou texte.</span>
-    </button>
+    <button class="btn primary big" id="goCam" type="button">Photographier un document</button>
+    <button class="btn big" id="goImport" type="button">Importer un document<span class="sous-btn">photo déjà prise, image ou PDF</span></button>
   </div>
-
-  <section class="install" id="installBloc">
-    <h2>Installez Kerckhoffs sur votre téléphone</h2>
-    <p>Ouvrez cette page dans votre navigateur (pas depuis une autre application), puis menu ⋮ → « Ajouter à l'écran d'accueil ». Ouvrez ensuite toujours Kerckhoffs par son icône : il se met à jour tout seul, et votre travail ne se perd pas quand vous passez d'une application à l'autre.</p>
-    <button class="btn primary" id="btnInstaller" type="button" hidden>Installer Kerckhoffs</button>
-    <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page.</p>
-  </section>
-
-  <section class="offline">
-    <p class="offline-state" id="offlineState">Préparation du mode hors ligne…</p>
-    <p>Kerckhoffs ne se connecte jamais à internet. <strong>Faites le test : activez le mode avion</strong>, puis utilisez l'application normalement.</p>
-  </section>
+  <p class="hint">Kerckhoffs repère les noms et les numéros tout seul. Vous relisez, vous complétez au doigt, puis vous envoyez.</p>
 
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
-  <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button> · <button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button> · <a class="link" id="lienFige" href="telecharger/kerckhoffs-0.6.1.html" download>Version figée, pour les usages sensibles</a></p>
-  <p class="fineprint">Version 0.6.1 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+
+  <section class="install" id="installBloc">
+    <h2>Installez Kerckhoffs sur votre téléphone</h2>
+    <p>Dans votre navigateur, menu ⋮ → « Ajouter à l'écran d'accueil ». Ouvrez ensuite toujours Kerckhoffs par son icône.</p>
+    <button class="btn primary" id="btnInstaller" type="button" hidden>Installer Kerckhoffs</button>
+  </section>
+
+  <details class="securite" id="secBloc">
+    <summary>Sécurité et versions</summary>
+    <section class="offline">
+      <p class="offline-state" id="offlineState">Préparation du mode hors ligne…</p>
+      <p>Kerckhoffs ne se connecte jamais à internet. <strong>Faites le test : activez le mode avion</strong>, puis utilisez l'application normalement.</p>
+    </section>
+    <p>Votre version ne change jamais toute seule. Une nouvelle version n'est installée que si vous allez la chercher, et seulement si elle est signée par l'auteur.</p>
+    <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page. Ouvrez-la dans votre navigateur, pas depuis une autre application.</p>
+    <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
+    <p class="home-links"><button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button></p>
+    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.7.0.html" download>Version figée, pour les usages sensibles</a></p>
+  </details>
+  <p class="fineprint">Version 0.7.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
 <main id="work" class="editor" hidden>
   <header class="bar">
     <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">Accueil</button>
-    <h2 id="workTitle">Photo rapide</h2>
+    <h2 id="workTitle">Document</h2>
     <span class="pageinfo" id="pageInfo"></span>
-    <button class="btn primary small" id="btnCam" type="button">Photo</button>
+    <button class="icon-btn anim-btn" id="animToggle" type="button" aria-pressed="true" aria-label="Animation avant l'envoi" title="Animation avant l'envoi"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="6" y="11" width="2.4" height="2.4"/><rect x="11" y="10" width="2.4" height="2.4"/><rect x="16" y="12" width="2.4" height="2.4"/><rect x="8" y="16" width="2" height="2"/><rect x="13.5" y="17" width="2" height="2"/><rect x="10" y="20.5" width="1.6" height="1.6"/></svg><span class="anim-barre" aria-hidden="true"></span></button>
+    <button class="btn primary small" id="btnCam" type="button">+ Page</button>
   </header>
 
   <div class="pages" id="pages" hidden></div>
@@ -69,8 +71,23 @@
   <div class="viewport" id="viewport">
     <canvas id="cv" width="10" height="10"></canvas>
     <div class="tampon" id="tampon" hidden aria-hidden="true"></div>
+
     <p class="toast" id="toast" role="status" hidden></p>
-    <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <div class="pile-haut">
+  <p class="tampon-note" id="tamponNote" hidden>Ce filigrane disparaît quand vous validez le document, au moment de l'envoyer. Tant qu'il n'est pas validé, la mention reste.</p>
+    <div class="trouves" id="trouves" hidden role="status">
+      <button class="btn small" id="trouvesPrec" type="button" aria-label="Élément précédent">‹</button>
+      <span id="trouvesTexte"></span>
+      <button class="btn small" id="trouvesSuiv" type="button" aria-label="Élément suivant">›</button>
+      <button class="btn small" id="trouvesFermer" type="button" aria-label="Fermer">✕</button>
+    </div>
+    <div class="pile-boutons">
+  <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+    <button class="btn small chercher-ici" id="chercherIci" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg> Rechercher ici</button>
+    </div>
+    </div>
+
+
     <button class="zones-chip" id="zonesChip" type="button" hidden></button>
     <button class="btn primary crop-screen" id="cropScreen" type="button" hidden>Garder ce qui est à l'écran</button>
     <div class="selbar" id="cropbar" hidden>
@@ -91,13 +108,14 @@
     </div>
   </div>
 
-  <div class="toolbar" role="radiogroup" aria-label="Outil">
-    <label class="tool"><input type="radio" name="tool" value="move" id="toolMove"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacer</span></label>
-    <label class="tool"><input type="radio" name="tool" value="crop" id="toolCrop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span></label>
+  <div class="toolbar" id="toolbar" role="radiogroup" aria-label="Outil">
     <label class="tool"><input type="radio" name="tool" value="brush" id="toolBrush" checked><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c2.5 0 4.5-1 5-3.5l10-10-3-3-10 10C2.5 15 3 18 3 21zM14 5l5 5"/></svg><span>Pinceau</span></label>
     <label class="tool"><input type="radio" name="tool" value="rect" id="toolRect"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span>Rectangle</span></label>
-    <label class="tool"><input type="radio" name="tool" value="erase" id="toolErase"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span></label>
+    <label class="tool tool-extra"><input type="radio" name="tool" value="move" id="toolMove"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacer</span></label>
+    <label class="tool tool-extra"><input type="radio" name="tool" value="crop" id="toolCrop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span></label>
+    <label class="tool tool-extra"><input type="radio" name="tool" value="erase" id="toolErase"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span></label>
     <button class="tool" id="undo" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg><span>Retour</span></button>
+    <button class="tool" id="toolPlus" type="button" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span id="toolPlusTexte">Plus</span></button>
   </div>
 
   <nav class="dock" aria-label="Actions principales">
@@ -132,25 +150,8 @@
       <button class="btn small" id="closeSheet" type="button">Fermer</button>
     </div>
 
-    <div class="group">
-      <label for="pays">Pays des documents</label>
-      <select id="pays"></select>
-      <p class="hint">Les règles de chaque pays sont dans le code, dossier rules/pays/. Chacun peut ajouter le sien.</p>
-    </div>
-
-    <div class="group">
-      <h4>Mon profil</h4>
-      <p class="hint" id="pfStatut">Aucun mot enregistré pour l'instant.</p>
-      <button class="btn" id="pfSave" type="button">Enregistrer mon profil (QR code)</button>
-      <button class="btn" id="pfOpen" type="button">Ouvrir un profil (image du QR code)</button>
-      <input type="file" id="inProfil" accept="image/*" hidden>
-      <p class="hint" id="zonesInfo"></p>
-      <button class="btn" id="zonesClear" type="button" hidden>Effacer les zones répétées</button>
-      <p class="hint">Le profil garde vos noms et mots à masquer, jamais vos documents. Il est chiffré par votre phrase de passe : sans elle, l'image est illisible.</p>
-    </div>
-
-    <div class="group" id="termsPanel">
-      <h4>Ce que Kerckhoffs doit masquer</h4>
+    <details class="group" id="termsPanel" open>
+      <summary>Ce qu'il faut masquer</summary>
       <label for="tNames">Noms et prénoms</label>
       <input type="text" id="tNames" autocomplete="off" placeholder="Ex. Jean Exemple, Marie Exemple">
       <label for="tAddr">Adresses</label>
@@ -158,45 +159,78 @@
       <label for="tOther">Autres termes</label>
       <input type="text" id="tOther" autocomplete="off" placeholder="Employeur, n° de dossier, nom du cabinet…">
       <p class="hint">Séparez par des virgules. Les numéros AVS, IBAN, téléphones, e-mails et longs numéros sont trouvés tout seuls.</p>
-    </div>
+      <label for="pays">Pays des documents</label>
+      <select id="pays"></select>
+      <p class="hint">Kerckhoffs repère les numéros propres au pays choisi.</p>
+      <button class="btn" id="detect" type="button">Détecter à nouveau</button>
+    </details>
 
-    <div class="group">
-      <button class="btn" id="detect" type="button">Détecter automatiquement</button>
-      <label class="brush" for="brush">Épaisseur du pinceau
-        <input type="range" id="brush" min="1" max="14" value="4">
-      </label>
-    </div>
+    <details class="group">
+      <summary>Mon profil</summary>
+      <p class="hint" id="pfStatut">Aucun mot enregistré pour l'instant.</p>
+      <button class="btn" id="pfSave" type="button">Enregistrer mon profil (QR code)</button>
+      <button class="btn" id="pfOpen" type="button">Ouvrir un profil (image du QR code)</button>
+      <input type="file" id="inProfil" accept="image/*" hidden>
+      <p class="hint" id="zonesInfo"></p>
+      <button class="btn" id="zonesClear" type="button" hidden>Effacer les zones répétées</button>
+      <p class="hint">Le profil garde vos noms et mots à masquer, jamais vos documents. Il est chiffré par votre phrase de passe : sans elle, l'image est illisible.</p>
+    </details>
 
-    <div class="group">
-      <h4>Export</h4>
-      <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
+    <details class="group">
+      <summary>Export</summary>
       <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
       <button class="btn" id="btnSave" type="button">Enregistrer sur l'appareil</button>
       <button class="btn" id="btnFile" type="button">Importer une image ou un PDF</button>
       <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées.</p>
-    </div>
+    </details>
 
-    <div class="group">
-      <button class="btn" id="btnCerbere" type="button">Vérifier avec Cerbère</button>
+    <details class="group">
+      <summary>Avancé</summary>
       <label class="check"><input type="checkbox" id="optStrict"> Mode strict (professionnels)</label>
-      <p class="hint">En mode strict, chaque alerte de Cerbère doit être traitée, puis un aperçu final s'affiche avant tout envoi.</p>
-      <p class="hint">Cerbère relit ce qui reste visible et signale ce qui pourrait encore vous trahir. Il vérifie aussi tout seul avant chaque envoi.</p>
-    </div>
+      <p class="hint">En mode strict, chaque point du contrôle « Remove Before Flight » doit être traité, puis un aperçu final s'affiche avant tout envoi.</p>
+      <label class="check" id="mentionBloc" hidden><input type="checkbox" id="optMention" checked> Ajouter la mention « Masqué avec Kerckhoffs » en bas du document</label>
+      <p class="hint">Sans le mode strict, chaque document envoyé porte en bas la mention « Masqué avec Kerckhoffs · non contrôlé en mode strict ». Seul un document contrôlé en mode strict peut partir sans mention.</p>
+      <button class="btn avec-avion" id="btnCerbere" type="button"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg> Lancer le contrôle « Remove Before Flight »</button>
+      <p class="hint">Avant chaque envoi, Kerckhoffs relit ce qui reste visible et signale ce qui pourrait encore vous identifier.</p>
+      <label class="check"><input type="checkbox" id="optAnim" checked> Animation avant l'envoi</label>
+      <p class="hint">Les zones masquées tombent comme du sable avant que le document parte. Aussi réglable avec le bouton en haut de l'écran de travail.</p>
+      <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
+      <p class="hint">Décochée, l'image part sans aucun masquage : à n'utiliser que pour un document sans données personnelles.</p>
+      <label class="brush" for="brush">Épaisseur du pinceau
+        <input type="range" id="brush" min="1" max="14" value="4">
+      </label>
+    </details>
 
     <p class="status" id="status" role="status"></p>
     <p class="legend" id="legend" hidden></p>
   </section>
 
   <!-- Cerbère : le rapport avant envoi -->
-  <section class="sheet cerbere" id="cerbere" hidden aria-label="Cerbère">
-    <div class="sheet-head"><h3>Cerbère</h3></div>
+  <section class="sheet cerbere" id="cerbere" hidden aria-label="Remove Before Flight : contrôle avant envoi">
+    <h3 class="ruban ruban-haut"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg><span>À retirer avant l'envoi</span><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg></h3>
+    <p class="rbf-alerte" id="cerbereAlerte" hidden><strong>Attention :</strong> un code postal, un âge, le sexe et une maladie rare suffisent souvent à retrouver une personne, même sans son nom. Si plusieurs de ces informations restent visibles, masquez-en au moins une avant d'envoyer.</p>
     <p id="cerbereIntro"></p>
     <ul class="cerbere-list" id="cerbereList"></ul>
-    <p class="hint">Touchez un point pour le voir sur l'image. Cerbère ne masque rien tout seul : vous décidez.</p>
+    <p class="hint">Touchez un point pour le voir sur l'image. Rien n'est masqué sans vous : vous décidez.</p>
     <p class="hint strict-note" id="cerbereStrictNote" hidden>Mode strict : traitez chaque point (Masquer ou Laisser) pour continuer.</p>
+    <button class="btn" id="cerbereBalayage" type="button">Dernier balayage : chercher partout ce qui est déjà masqué</button>
     <div class="cerbere-foot">
       <button class="btn" id="cerbereBack" type="button">Revenir</button>
       <button class="btn primary" id="cerbereSend" type="button">Envoyer</button>
+    </div>
+    <p class="ruban ruban-bas" lang="en"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg><span>Remove before flight</span><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg></p>
+  </section>
+
+  <!-- Le document part : les zones masquées tombent comme du sable, puis l'image envoyée se pose -->
+  <section class="envol" id="envol" hidden aria-label="Le document est prêt à partir">
+    <canvas id="envolCv" aria-hidden="true"></canvas>
+    <button class="link envol-passer" id="envolPasser" type="button">Passer</button>
+    <div class="envol-bar" id="envolBar" hidden>
+      <p class="envol-texte">Ce qui était masqué n'existe plus. Voici exactement ce qui part.</p>
+      <div class="cerbere-foot">
+        <button class="btn" id="envolRevenir" type="button">Revenir</button>
+        <button class="btn primary" id="envolEnvoyer" type="button">Envoyer</button>
+      </div>
     </div>
   </section>
 </main>
@@ -274,7 +308,12 @@
 <!-- Vérification de la version, au premier lancement -->
 <section class="overlay" id="verif" hidden aria-label="Vérifiez votre version">
   <div class="overlay-inner">
-    <h3>Vérifiez votre version de Kerckhoffs</h3>
+    <h3>Votre version de Kerckhoffs</h3>
+    <p class="verif-statut" id="verStatut">Vérification en cours…</p>
+    <p><strong>Elle ne changera jamais toute seule.</strong> Elle reste exactement la même, avec ou sans internet. Une nouvelle version n'est installée que si vous allez la chercher, et seulement si elle est signée par l'auteur.</p>
+    <button class="btn primary" id="verifOk" type="button">Continuer</button>
+    <details class="verif-plus">
+    <summary>En savoir plus</summary>
     <dl class="verif-list">
       <dt>Version</dt><dd id="verVersion"></dd>
       <dt>Vous l'utilisez depuis</dt><dd id="verOrigine"></dd>
@@ -282,7 +321,7 @@
       <dt>Numéro de référence</dt><dd id="verEmpreinte" class="empreinte">calcul…</dd>
     </dl>
     <p>Les deux adresses doivent être identiques, et le numéro de référence doit être le même que celui publié pour cette version, à l'adresse officielle. Chaque version officielle est signée par l'auteur de Kerckhoffs.</p>
-    <p><strong>Votre version ne change jamais toute seule.</strong> Celle que vous vérifiez maintenant reste exactement la même, avec ou sans internet, tant que vous ne l'effacez pas. Si une nouvelle version existe, Kerckhoffs vous le dit, c'est tout : c'est vous qui allez la chercher, quand vous voulez. Elle est alors vérifiée avant de vous être proposée, et refusée si elle n'est pas signée.</p>
+    <p>Si une nouvelle version existe, Kerckhoffs vous le dit, c'est tout : c'est vous qui allez la chercher, quand vous voulez. Elle est alors vérifiée avant de vous être proposée, et refusée si elle n'est pas signée.</p>
     <div class="verif-lien" id="verLienBloc">
       <a class="btn" id="lienVersions" target="_blank" rel="noopener noreferrer">Ouvrir la liste officielle des versions</a>
       <p class="hint">Vérifiez que la barre d'adresse affiche bien : <span class="empreinte" id="adrVersions"></span></p>
@@ -297,7 +336,7 @@
       <p class="empreinte" id="msgResultat" role="status"></p>
     </details>
     <p class="hint">Une fausse copie pourrait afficher ce même écran, avec un faux lien. Le plus sûr reste de connaître l'adresse officielle par un autre moyen : un favori, ou quelqu'un de confiance. Pour les usages sensibles, il existe aussi un fichier signé qui ne se met jamais à jour tout seul.</p>
-    <button class="btn primary" id="verifOk" type="button">J'ai vérifié</button>
+    </details>
   </div>
 </section>
 

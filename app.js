@@ -36,14 +36,11 @@
     });
   })();
 
-  const FORMATS = {
-    quick: [["image", "Image"], ["light", "Image allégée"], ["text", "Texte seul"]],
-    folder: [["pdf", "PDF"], ["light", "Image allégée"], ["text", "Texte seul"]],
-  };
+  // Un seul espace de travail : une ou plusieurs pages.
+  const FORMATS = [["image", "Image"], ["pdf", "PDF"], ["light", "Image allégée"], ["text", "Texte seul"]];
 
   /* ------------------------------------------------------------------ état */
   const S = {
-    mode: "quick",
     pages: [],          // { img, name, strokes:[], boxes:[], lines:null }
     cur: 0,
     tokens: new Map(),  // clé -> { token, type, value }
@@ -62,6 +59,7 @@
   const ctx = cv.getContext("2d");
   const page = () => S.pages[S.cur];
   const changed = () => { S.version++; };
+  let cerbereOk = -1;        // version du document déjà validée par la vérification avant envoi
 
   // Le message s'affiche sous l'image et, bien visible, par-dessus l'image.
   let busy = false;
@@ -79,18 +77,13 @@
   }
 
   /* ------------------------------------------------------------ navigation */
-  function openWork(mode) {
-    S.mode = mode;
+  function openWork() {
     wipe();
     $("home").hidden = true;
     $("work").hidden = false;
-    $("workTitle").textContent = mode === "quick" ? "Photo rapide" : "Dossier";
-    $("inFile").multiple = mode !== "quick";
-    $("btnFile").textContent = mode === "quick" ? "Importer une image" : "Importer une image ou un PDF";
-    $("emptyFile").textContent = $("btnFile").textContent;
+    $("inFile").multiple = true;
+    $("inFile").accept = "application/pdf,image/*";
     closeSheet();
-    if (mode === "folder") setTimeout(() => { if (!S.pages.length) openSheet(); }, 50); // d'abord : ce qu'il faut masquer
-    $("inFile").accept = mode === "quick" ? "image/*" : "application/pdf,image/*";
     buildFormats();
     updateUI();
     window.scrollTo(0, 0);
@@ -99,6 +92,7 @@
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
     S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true; $("zonesChip").hidden = true;
+    S.balayage = []; S.trouves = null; S.orange = null; if ($("trouves")) $("trouves").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
     profilSnapshot = "";
     history.length = 0;
@@ -129,7 +123,7 @@
   function buildFormats() {
     const box = $("formats");
     box.textContent = "";
-    FORMATS[S.mode].forEach(([val, label], i) => {
+    FORMATS.forEach(([val, label], i) => {
       const l = document.createElement("label");
       const r = document.createElement("input");
       r.type = "radio"; r.name = "fmt"; r.value = val; r.id = "fmt-" + val; r.checked = i === 0;
@@ -140,15 +134,19 @@
   }
   const fmt = () => (document.querySelector('input[name="fmt"]:checked') || {}).value;
 
+  // Le filigrane « ORIGINAL · NON MASQUÉ » reste sur l'écran tant que le document n'est pas validé (vérification avant envoi passée).
+  function majFiligrane() {
+    const cache = !S.pages.length || cerbereOk === S.version;
+    $("tampon").hidden = cache; $("tamponNote").hidden = cache;
+  }
   function updateUI() {
     const has = S.pages.length > 0;
     $("empty").hidden = has;
-    $("tampon").hidden = !has;
+    majFiligrane();
     cv.hidden = !has;
     ["detect", "btnShare", "btnCopy", "btnSave"].forEach((id) => { $(id).disabled = !has; });
     updateUndo();
     $("pageInfo").textContent = S.pages.length > 1 ? `page ${S.cur + 1} / ${S.pages.length}` : "";
-    $("btnCam").textContent = S.mode === "quick" ? "Photo" : "+ Page";
     $("btnCam").hidden = !has;
     const pg = $("pages");
     pg.hidden = S.pages.length < 2;
@@ -191,7 +189,10 @@
     return c;
   }
 
-  const newPage = (img, name) => ({ img, name, strokes: [], boxes: [], lines: null });
+  // source : la photo d'origine, en pleine résolution, gardée compressée pour « Rechercher ici ».
+  // k : combien de pixels d'origine pour un pixel de l'image de travail ; off : décalage dû au recadrage.
+  const newPage = (img, name, source) => ({ img, name, strokes: [], boxes: [], lines: null, source: source || null, off: { x: 0, y: 0 } });
+  const sourceDe = (blob, largeur, c) => (blob && largeur > c.width * 1.05 ? { blob, k: largeur / c.width } : null);
 
   async function addFiles(files) {
     if (!files.length) return;
@@ -218,7 +219,7 @@
           const im = await loadImage(f);
           const c = toCanvas(im, im.width, im.height);
           if (await estUnProfil(c)) continue; // c'est un QR code de profil, pas une page
-          added.push(newPage(c, f.name || "photo"));
+          added.push(newPage(c, f.name || "photo", sourceDe(f, im.width, c)));
           if (im.close) im.close();
         }
       } catch (e) {
@@ -231,13 +232,12 @@
   function addPages(added) {
     if (!added.length) return;
     closeSheet();
-    if (S.mode === "quick") { S.pages = [added[0]]; S.tokens = new Map(); S.counters = {}; S.cur = 0; }
-    else { S.pages.push(...added); S.cur = S.pages.length - added.length; }
+    S.pages.push(...added); S.cur = S.pages.length - added.length;
     changed();
     setStatus("");
     updateUI();
     requestAnimationFrame(() => { fitView(); render(); });
-    detectPages(added); // la détection démarre toute seule, dans les deux modes
+    detectPages(added); // la détection démarre toute seule
   }
 
   /* ------------- caméra intégrée : la photo reste sur l'ardoise, jamais dans la galerie */
@@ -327,20 +327,20 @@
     const v = $("camVideo");
     if (!v.videoWidth) return;
     $("camShot").disabled = true;
-    let c = null;
+    let c = null, source = null;
     // Une vraie photo (meilleure netteté) si le téléphone le permet, sinon une image de la vidéo.
     // Dans les deux cas, elle reste en mémoire : rien n'est écrit sur le téléphone.
     try {
       if ("ImageCapture" in window) {
         const blob = await new ImageCapture(piste()).takePhoto();
         const im = await createImageBitmap(blob);
-        c = toCanvas(im, im.width, im.height); im.close && im.close();
+        c = toCanvas(im, im.width, im.height); source = sourceDe(blob, im.width, c); im.close && im.close();
       }
     } catch (e) { c = null; }
     if (!c) c = toCanvas(v, v.videoWidth, v.videoHeight);
     $("camShot").disabled = false;
     fermerCamera();
-    estUnProfil(c).then((profil) => { if (!profil) addPages([newPage(c, "photo")]); });
+    estUnProfil(c).then((profil) => { if (!profil) addPages([newPage(c, "photo", source)]); });
   });
   $("camSysteme").addEventListener("click", () => {
     fermerCamera();
@@ -372,6 +372,7 @@
     const v = S.view;
     const atFit = Math.abs(v.s - v.fit) < 0.001 && Math.abs(v.tx - v.tx0) < 1 && Math.abs(v.ty - v.ty0) < 1;
     $("fit").hidden = !page() || atFit;
+    $("chercherIci").hidden = !page() || v.s < v.fit * 1.3;
   }
   function fitView() {
     const p = page(); if (!p) return;
@@ -380,13 +381,13 @@
     const s = Math.min(r.width / p.img.width, r.height / p.img.height);
     S.view = { s, tx: (r.width - p.img.width * s) / 2, ty: (r.height - p.img.height * s) / 2, fit: s };
     S.view.tx0 = S.view.tx; S.view.ty0 = S.view.ty;
-    applyView(); $("fit").hidden = true;
+    applyView(); $("fit").hidden = true; $("chercherIci").hidden = true;
   }
 
   // Un élément dessiné : un trait de pinceau { kind:"line", w, pts } ou un rectangle { kind:"rect", x, y, w, h }.
-  function strokePath(c, st) {
+  function strokePath(c, st, couleur) {
     c.save();
-    c.fillStyle = "#000"; c.strokeStyle = "#000";
+    c.fillStyle = couleur || "#000"; c.strokeStyle = couleur || "#000";
     if (st.kind === "rect") { c.fillRect(st.x, st.y, st.w, st.h); c.restore(); return; }
     c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = st.w;
     if (st.pts.length === 1) {
@@ -431,6 +432,7 @@
     p.boxes.forEach((b) => drawBox(c, b, final));
   }
   function render() {
+    majFiligrane();
     const p = page(); if (!p) return;
     paint(ctx, p, true, false);
     if (S.cadre && S.cadre.page === p) dessinerCadre(S.cadre.rect);
@@ -451,6 +453,36 @@
       poignees(r, "#2b5fe0");
     }
     if (S.cadre && S.cadre.page === p) poignees(S.cadre.rect, "#ffffff");
+    // Zones d'écriture non lues, pendant le contrôle Remove Before Flight : en orange, en pointillés.
+    if (S.orange) {
+      ctx.save(); ctx.setLineDash([14, 8]); ctx.lineWidth = Math.max(3, cv.width / 350); ctx.strokeStyle = "#e08a1e"; ctx.fillStyle = "rgba(224,138,30,.12)";
+      S.orange.filter((o) => o.page === S.cur).forEach((o) => o.rects.forEach((r) => { ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x, r.y, r.w, r.h); }));
+      ctx.restore();
+    }
+    // Éléments qui viennent d'être trouvés : ils scintillent quelques secondes, pour qu'on aille les vérifier.
+    if (S.trouves) {
+      const T = S.trouves, t = (performance.now() - T.t0) / 1000;
+      const eclat = t < 6 ? 0.55 + 0.45 * Math.sin(t * 7) : 0.9;
+      ctx.save();
+      T.items.forEach((it, i) => {
+        if (it.page !== S.cur) return;
+        const courant = i === T.i;
+        ctx.globalAlpha = courant ? 1 : eclat;
+        ctx.lineWidth = Math.max(courant ? 6 : 4, cv.width / (courant ? 220 : 320));
+        ctx.strokeStyle = courant ? "#ffd400" : "#ffc400";
+        ctx.shadowColor = "#ffe066"; ctx.shadowBlur = courant ? 18 : 10;
+        it.rects.forEach((r) => {
+          const m = ctx.lineWidth;
+          ctx.strokeRect(r.x - m, r.y - m, r.w + 2 * m, r.h + 2 * m);
+          // petite étincelle au coin
+          const cx = r.x + r.w + m, cy = r.y - m, a = Math.max(6, cv.width / 140) * (courant ? 1.3 : 1);
+          ctx.beginPath(); ctx.moveTo(cx, cy - a); ctx.lineTo(cx + a * 0.25, cy - a * 0.25); ctx.lineTo(cx + a, cy); ctx.lineTo(cx + a * 0.25, cy + a * 0.25);
+          ctx.lineTo(cx, cy + a); ctx.lineTo(cx - a * 0.25, cy + a * 0.25); ctx.lineTo(cx - a, cy); ctx.lineTo(cx - a * 0.25, cy - a * 0.25); ctx.closePath();
+          ctx.fillStyle = "#ffd400"; ctx.fill();
+        });
+      });
+      ctx.restore();
+    }
   }
   // Les quatre coins d'une sélection : on les tire pour l'agrandir, on glisse l'intérieur pour la déplacer.
   function poignees(r, couleur) {
@@ -696,12 +728,12 @@
     const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y));
     const w = Math.min(p.img.width - x, Math.round(r.w)), h = Math.min(p.img.height - y, Math.round(r.h));
     if (w < 20 || h < 20) { annulerCadre(); return; }
-    const avant = { img: p.img, strokes: p.strokes, lines: p.lines, boxes: p.boxes };
+    const avant = { img: p.img, strokes: p.strokes, lines: p.lines, boxes: p.boxes, off: p.off };
     const c = document.createElement("canvas"); c.width = w; c.height = h;
     c.getContext("2d").drawImage(p.img, -x, -y);
     // Les traits déjà faits suivent le recadrage ; la lecture du texte est refaite sur la nouvelle image.
     p.strokes = p.strokes.map((st) => st.kind === "rect" ? { ...st, x: st.x - x, y: st.y - y } : { ...st, pts: st.pts.map(([px, py]) => [px - x, py - y]) });
-    p.img = c; p.lines = null; p.boxes = [];
+    p.img = c; p.lines = null; p.boxes = []; p.off = { x: p.off.x + x, y: p.off.y + y };
     history.push({ type: "crop", page: p, avant });
     S.cadre = null; $("cropbar").hidden = true;
     fitView(); changed(); render();
@@ -788,6 +820,70 @@
     if (S.pages.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
   });
   $("selbar").addEventListener("pointerdown", (e) => e.stopPropagation()); // les boutons ne dessinent pas
+  // Ce qui est actif maintenant, pour retrouver ensuite les éléments nouvellement masqués.
+  // On compare mot par mot : un mot déjà masqué avant n'est pas « nouveau », même si une autre règle l'a repris.
+  const cleMot = (pi, w) => pi + "|" + Math.round(w.bbox.x0) + "," + Math.round(w.bbox.y0) + "|" + w.text;
+  function instantane() { return new Set(S.pages.flatMap((p, pi) => p.boxes.filter((b) => b.active).flatMap((b) => (b.words || []).map((w) => cleMot(pi, w))))); }
+  function nouveaux(avant, sauf) {
+    const out = [];
+    S.pages.forEach((p, pi) => p.boxes.forEach((b) => {
+      if (!b.active || (b.words || []).every((w) => avant.has(cleMot(pi, w)))) return;
+      if (sauf && sauf.page === p) { const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r = sauf.rect; if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) return; }
+      out.push({ page: pi, rects: b.rects || [b] });
+    }));
+    return out;
+  }
+
+  // Découpe une zone sélectionnée en informations distinctes : une par ligne, coupée aux grands espaces,
+  // l'étiquette (« N° contribuable : ») écartée, et chaque numéro séparé des mots qui l'entourent.
+  // Garde-fou : un morceau trop court ou trop courant (« 002 », « de ») n'est jamais cherché seul.
+  function elementsDeSelection(p, rect) {
+    const parLigne = new Map();
+    p.lines.forEach((l, li) => l.words.forEach((w) => {
+      const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
+      if (cx >= rect.x && cx <= rect.x + rect.w && cy >= rect.y && cy <= rect.y + rect.h) {
+        if (!parLigne.has(li)) parLigne.set(li, []);
+        parLigne.get(li).push(w);
+      }
+    }));
+    const elements = [];
+    const ajouter = (t) => {
+      t = t.replace(/^[\s,;:.\-–]+|[\s,;:–]+$/g, "");
+      if (!t) return;
+      if (/\d/.test(t)) {
+        if (t.replace(/\D/g, "").length < 4 && !K.formeIdentifiant(t)) return;
+      } else if (!K.motsACherche(t).length) return;
+      if (!elements.includes(t)) elements.push(t);
+    };
+    for (const mots of parLigne.values()) {
+      mots.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+      const h = mots.map((w) => w.bbox.y1 - w.bbox.y0).sort((a, b) => a - b)[Math.floor(mots.length / 2)] || 10;
+      const groupes = [[mots[0]]];
+      for (let i = 1; i < mots.length; i++) {
+        if (mots[i].bbox.x0 - mots[i - 1].bbox.x1 > h * 1.6) groupes.push([]);
+        groupes[groupes.length - 1].push(mots[i]);
+      }
+      for (const g of groupes) {
+        const texte = g.map((w) => w.text).join(" ");
+        const valeurs = K.valeursApresEtiquettes(texte).map((v) => v.valeur);
+        for (let morceau of valeurs.length ? valeurs : [texte]) {
+          if (morceau.includes(":")) morceau = morceau.slice(morceau.lastIndexOf(":") + 1);
+          // S'il y a un numéro, on ne cherche que les numéros : les mots autour (« Dossier n° », « Code client »)
+          // sont des étiquettes, pas des données. Sans numéro, le groupe entier est cherché (un nom, une adresse).
+          const runs = [];
+          for (const t of morceau.split(/\s+/).filter(Boolean)) {
+            const num = /\d/.test(t), dern = runs[runs.length - 1];
+            if (dern && dern.num === num) dern.mots.push(t); else runs.push({ num, mots: [t] });
+          }
+          const nums = runs.filter((r) => r.num);
+          if (nums.length) nums.forEach((r) => ajouter(r.mots.join(" ")));
+          else ajouter(morceau);
+        }
+      }
+    }
+    return elements;
+  }
+
   $("selAll").addEventListener("click", async () => {
     if (!S.sel || busy) return;
     const { page: p, rect } = S.sel;
@@ -798,28 +894,133 @@
       setStatus("Lecture du texte…", true);
       await ocr(p);
     } catch (e) { setStatus("La lecture du texte a échoué : la zone a été masquée seule."); return; }
-    const dedans = [];
-    p.lines.forEach((l) => l.words.forEach((w) => {
-      const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
-      if (cx >= rect.x && cx <= rect.x + rect.w && cy >= rect.y && cy <= rect.y + rect.h) dedans.push(w.text);
-    }));
-    if (!dedans.length) { setStatus("Aucun texte lu dans cette zone : elle a été masquée seule."); return; }
-    const texte = dedans.join(" ").replace(/[,;:]+$/, "");
-    const m = motifDe(texte);
-    let type;
-    if (m.kind === "regle") { m.regles.forEach((r) => { if (!S.extra.some((x) => x.id === r.id)) S.extra.push(r); }); type = m.regles[0].type; }
-    else {
-      const champ = $("tOther");
-      champ.value = champ.value.trim() ? champ.value.trim() + ", " + m.terme : m.terme;
-      type = "DONNEE";
+    const elements = elementsDeSelection(p, rect);
+    if (!elements.length) { setStatus("Aucune information à chercher dans cette zone : elle a été masquée seule."); return; }
+    const termes = [];
+    for (const el of elements) {
+      const m = motifDe(el);
+      // Garde-fou : une forme faite seulement de chiffres et trop courte (« 9999 ») attraperait toutes les années et tous les codes.
+      // Pour un numéro court, on cherche ce numéro exact, pas sa forme.
+      if (m.kind === "regle") m.regles.filter((r) => !(r.forme && /^[9 ]+$/.test(r.forme) && r.forme.replace(/ /g, "").length < 8))
+        .forEach((r) => { if (!S.extra.some((x) => x.id === r.id)) S.extra.push(r); });
+      else termes.push(m.terme);
     }
+    if (termes.length) {
+      const champ = $("tOther"), deja = champ.value.split(",").map((x) => norm(x.trim()));
+      const ajout = termes.filter((t) => !deja.includes(norm(t)));
+      if (ajout.length) champ.value = [champ.value.trim(), ...ajout].filter(Boolean).join(", ");
+    }
+    const avant = instantane();
     S.tokens = new Map(); S.counters = {};
-    await detectPages(S.pages, () => {
-      const n = S.pages.reduce((s, q) => s + q.boxes.filter((b) => b.active && b.token.startsWith("[" + type + "_")).length, 0);
-      if (!n) { return "Rien de semblable trouvé : la zone a été masquée seule."; }
-      return `${n} ${n > 1 ? m.pl : m.sg} masqué${m.fem ? "e" : ""}${n > 1 ? "s" : ""} sur tout le document (« ${texte} »). Touchez une zone pour la démasquer.`;
-    });
+    await detectPages(S.pages, () => "");
+    const items = nouveaux(avant, { page: p, rect });
+    const liste = elements.map((e) => "« " + e + " »").join(", ");
+    setStatus(items.length
+      ? `${items.length} élément${items.length > 1 ? "s" : ""} semblable${items.length > 1 ? "s" : ""} masqué${items.length > 1 ? "s" : ""} (cherché : ${liste}). Vérifiez-les avec les flèches ‹ ›.`
+      : `Rien de semblable ailleurs (cherché : ${liste}). La zone a été masquée.`, true);
+    montrerTrouves(items, true);
   });
+
+  /* ------------------ éléments trouvés : vue d'ensemble, étincelles, et on va les voir un par un */
+  let scintille = 0;
+  function montrerTrouves(items, vueEntiere) {
+    if (!items.length) { fermerTrouves(); return; }
+    S.trouves = { items, i: -1, t0: performance.now() };
+    if (vueEntiere) {
+      const p0 = items.find((it) => it.page === S.cur) ? S.cur : items[0].page;
+      if (p0 !== S.cur) { S.cur = p0; updateUI(); }
+      fitView();
+    }
+    majTrouves(); render();
+    cancelAnimationFrame(scintille);
+    let dernier = 0;
+    const boucle = (t) => {
+      if (!S.trouves || t - S.trouves.t0 > 6200) { render(); return; }
+      if (t - dernier > 50) { dernier = t; render(); }
+      scintille = requestAnimationFrame(boucle);
+    };
+    scintille = requestAnimationFrame(boucle);
+  }
+  function majTrouves() {
+    const T = S.trouves;
+    $("trouves").hidden = !T;
+    if (!T) return;
+    const n = T.items.length;
+    $("trouvesTexte").textContent = T.i < 0 ? `${n} trouvé${n > 1 ? "s" : ""} · ‹ › pour vérifier` : `${T.i + 1} / ${n}`;
+  }
+  function fermerTrouves() { S.trouves = null; cancelAnimationFrame(scintille); majTrouves(); render(); }
+  function zoomSur(r) {
+    fitView();
+    const vr = $("viewport").getBoundingClientRect();
+    const s = Math.min(S.view.fit * 6, Math.max(S.view.fit * 1.5, Math.min((vr.width * 0.6) / r.w, (vr.height * 0.35) / r.h)));
+    S.view.s = s; S.view.tx = vr.width / 2 - (r.x + r.w / 2) * s; S.view.ty = vr.height / 2 - (r.y + r.h / 2) * s;
+    applyView(); showFit();
+  }
+  function allerTrouve(d) {
+    const T = S.trouves; if (!T) return;
+    T.i = (T.i + d + T.items.length) % T.items.length;
+    const it = T.items[T.i];
+    if (it.page !== S.cur) { S.cur = it.page; updateUI(); }
+    const x0 = Math.min(...it.rects.map((r) => r.x)), y0 = Math.min(...it.rects.map((r) => r.y));
+    const x1 = Math.max(...it.rects.map((r) => r.x + r.w)), y1 = Math.max(...it.rects.map((r) => r.y + r.h));
+    zoomSur({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    majTrouves(); render();
+  }
+  $("trouves").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("trouvesPrec").addEventListener("click", () => allerTrouve(-1));
+  $("trouvesSuiv").addEventListener("click", () => allerTrouve(1));
+  $("trouvesFermer").addEventListener("click", () => { fermerTrouves(); fitView(); render(); });
+
+  /* ------------- « Rechercher ici » : relire de près la zone affichée, sur la photo en pleine résolution */
+  // Les petits caractères (un numéro en bas de page) sont souvent trop petits pour le moteur de lecture.
+  // On découpe ce qui est à l'écran dans la photo d'origine, on l'agrandit, on le relit, et on cherche dedans.
+  async function chercherIci() {
+    const p = page(); if (!p || busy) return;
+    const z = zoneVisible(); if (z.w < 8 || z.h < 8) return;
+    busy = true; $("chercherIci").disabled = true; $("detect").disabled = true;
+    setStatus("Lecture de près de cette zone…", true);
+    let bm = null;
+    try {
+      if (!p.lines) { busy = false; await ocr(p); busy = true; }
+      let source = p.img, k = 1;
+      if (p.source && p.source.blob) {
+        try { bm = await createImageBitmap(p.source.blob, { imageOrientation: "from-image" }); source = bm; k = p.source.k; } catch (e) { bm = null; }
+      }
+      const sx = (z.x + p.off.x) * k, sy = (z.y + p.off.y) * k, sw = z.w * k, sh = z.h * k;
+      const f = Math.max(1, Math.min(3, 2000 / Math.max(sw, sh)));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(sw * f)); c.height = Math.max(1, Math.round(sh * f));
+      const cx = c.getContext("2d");
+      cx.imageSmoothingQuality = "high"; cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
+      cx.drawImage(source, sx, sy, sw, sh, 0, 0, c.width, c.height);
+      if (bm && bm.close) { bm.close(); bm = null; }
+      const copie = pourLecture(c), echelle = copie.facteur * f * k;
+      const w = await getWorker();
+      const { data } = await w.recognize(copie);
+      const ramener = (b) => ({ x0: z.x + b.x0 / echelle, y0: z.y + b.y0 / echelle, x1: z.x + b.x1 / echelle, y1: z.y + b.y1 / echelle });
+      const lu = linesOf(data).map((l) => ({ words: (l.words || []).filter((x) => x.text && x.text.trim()).map((x) => ({ text: x.text, bbox: ramener(x.bbox), conf: x.confidence })) }))
+        .filter((l) => l.words.length);
+      // La lecture de près remplace l'ancienne lecture de cette zone.
+      const dedans = (wd) => { const mx = (wd.bbox.x0 + wd.bbox.x1) / 2, my = (wd.bbox.y0 + wd.bbox.y1) / 2; return mx >= z.x && mx <= z.x + z.w && my >= z.y && my <= z.y + z.h; };
+      p.lines = p.lines.map((l) => ({ words: l.words.filter((wd) => !dedans(wd)) })).filter((l) => l.words.length).concat(lu);
+      const avant = instantane();
+      detect(p); changed(); render();
+      const items = nouveaux(avant);
+      const nMots = lu.reduce((n, l) => n + l.words.length, 0);
+      setStatus(items.length
+        ? `Lecture de près : ${items.length} élément${items.length > 1 ? "s" : ""} de plus masqué${items.length > 1 ? "s" : ""} dans cette zone.`
+        : nMots ? `Lecture de près : ${nMots} mot${nMots > 1 ? "s" : ""} lu${nMots > 1 ? "s" : ""}, rien de plus à masquer ici.` : "Lecture de près : aucun texte lisible ici. Si quelque chose doit disparaître, effacez-le au doigt.", true);
+      montrerTrouves(items, false);
+    } catch (e) {
+      setStatus("La lecture de près a échoué. Effacez au doigt, ou réessayez.");
+    } finally {
+      if (bm && bm.close) bm.close();
+      busy = false; $("chercherIci").disabled = false; $("detect").disabled = !S.pages.length;
+      updateUI(); renderLegend();
+    }
+  }
+  $("chercherIci").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("chercherIci").addEventListener("click", chercherIci);
 
   /* --------------------------------------------- lecture (OCR) et détection */
   let workerP = null;
@@ -903,6 +1104,11 @@
       if (splitWords) t.split(/\s+/).filter((w) => w.length >= 3).forEach((w) => out.push({ type, value: t, key, needle: w }));
     });
     add("tNames", "PERSONNE", true); add("tAddr", "ADRESSE", false); add("tOther", "DONNEE", false);
+    // Dernier balayage : ce qui a déjà été masqué quelque part est cherché partout ailleurs.
+    (S.balayage || []).forEach((t) => {
+      out.push(t);
+      if (t.type === "PERSONNE") t.value.split(/\s+/).filter((w) => w.length >= 3).forEach((w) => out.push({ ...t, needle: w }));
+    });
     return out.sort((a, b) => (b.needle || b.value).length - (a.needle || a.value).length);
   }
 
@@ -970,6 +1176,11 @@
       for (const v of K.valeursApresEtiquettes(raw)) {
         take(rr, v.debut, v.fin, v.etiquette.type, v.valeur, v.etiquette.type + "|" + norm(v.valeur));
       }
+      // Identifiants reconnus à leur forme, dans n'importe quel pays (rules/registre.js : K.formeIdentifiant).
+      // Forme très typique : masqué d'office. Forme douteuse : signalé avant l'envoi, dans Remove Before Flight.
+      for (const c of K.candidatsIdentifiant(raw)) {
+        if (c.niveau === 2) take(rr, c.debut, c.fin, "IDENT", c.valeur, "IDENT|" + c.valeur.replace(/[\s.\-\/_]/g, "").toLowerCase());
+      }
       for (const t of terms) {
         const needle = norm(t.needle || t.value);
         let from = 0, k;
@@ -1016,9 +1227,7 @@
           "La photo est peut-être trop pâle à cet endroit : encadrez-le avec « Rectangle »."
         : "";
       if (message) setStatus(message() + manque, !!manque); else setStatus((n ? `${n} zone${n > 1 ? "s" : ""} masquée${n > 1 ? "s" : ""} automatiquement.${flagged ? ` ${flagged} à relire (encadrée en orange).` : ""} Relisez et complétez au doigt.`
-                  : (S.mode === "quick"
-                      ? "Rien trouvé automatiquement. Pour les noms, écrivez-les dans « Réglages », ou effacez-les au doigt."
-                      : "Rien trouvé automatiquement. Effacez au doigt ce que vous voulez cacher.")) + manque, !!manque);
+                  : "Rien trouvé automatiquement. Pour les noms, écrivez-les dans « Réglages », ou effacez-les au doigt.") + manque, !!manque);
     } catch (e) {
       setStatus("La lecture du texte a échoué (" + ((e && (e.message || e)) + "").slice(0, 120) + "). Effacez au doigt, ou réessayez.");
     } finally {
@@ -1027,8 +1236,7 @@
     }
   }
   $("detect").addEventListener("click", () => {
-    const list = S.mode === "quick" ? [page()] : S.pages;
-    detectPages(list.filter(Boolean));
+    detectPages(S.pages.filter(Boolean));
   });
   ["tNames", "tAddr", "tOther"].forEach((id) => $(id).addEventListener("change", () => {
     if (!S.pages.length) return;
@@ -1046,6 +1254,23 @@
   $("optMask").addEventListener("change", () => { changed(); renderLegend(); });
 
   /* ------------------------------------------------------------- export */
+  // La mention en bas des documents envoyés. Sans le mode strict, elle est toujours là.
+  // Seul un document contrôlé en mode strict peut partir sans mention, si l'utilisateur le choisit.
+  const avecMention = () => !strict || $("optMention").checked;
+  const texteMention = () => "Masqué avec Kerckhoffs · " + (strict ? "contrôlé" : "non contrôlé") + " en mode strict";
+  function avecBande(c, masked) {
+    if (!masked || !avecMention()) return c;
+    const h = Math.max(22, Math.round(c.width * 0.028));
+    const o = document.createElement("canvas");
+    o.width = c.width; o.height = c.height + h;
+    const x = o.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, o.width, o.height);
+    x.drawImage(c, 0, 0);
+    x.fillStyle = "#eef1f4"; x.fillRect(0, c.height, o.width, h);
+    x.fillStyle = "#5a6872"; x.font = `${Math.round(h * 0.5)}px system-ui, sans-serif`; x.textBaseline = "middle";
+    x.fillText(texteMention(), Math.round(h * 0.6), c.height + h / 2);
+    return o;
+  }
   function finalCanvas(p, masked) {
     const c = document.createElement("canvas");
     c.width = p.img.width; c.height = p.img.height;
@@ -1126,14 +1351,15 @@
   async function buildOutput() {
     const f = fmt(), masked = $("optMask").checked, base = "kerckhoffs-" + stamp();
     if (f === "text") {
-      const text = await buildText(masked);
+      let text = await buildText(masked);
+      if (masked && avecMention()) text += "\n\n— " + texteMention();
       return { text, files: [new File([text], base + ".txt", { type: "text/plain" })] };
     }
     if (f === "pdf") {
       const { jsPDF } = window.jspdf;
       let doc = null;
       for (const p of S.pages) {
-        const c = finalCanvas(p, masked);
+        const c = avecBande(finalCanvas(p, masked), masked);
         const o = c.width > c.height ? "l" : "p";
         if (!doc) doc = new jsPDF({ orientation: o, unit: "px", format: [c.width, c.height], hotfixes: ["px_scaling"], compress: true });
         else doc.addPage([c.width, c.height], o);
@@ -1147,6 +1373,7 @@
     for (let i = 0; i < S.pages.length; i++) {
       let c = finalCanvas(S.pages[i], masked);
       if (f === "light") c = lighten(c);
+      c = avecBande(c, masked);
       const b = await blobOf(c, "image/jpeg", f === "light" ? 0.72 : 0.9);
       files.push(new File([b], `${base}${S.pages.length > 1 ? "-p" + (i + 1) : ""}.jpg`, { type: "image/jpeg" }));
     }
@@ -1154,7 +1381,7 @@
   }
 
   async function prepared() {
-    const key = S.version + "|" + fmt() + "|" + $("optMask").checked;
+    const key = S.version + "|" + fmt() + "|" + $("optMask").checked + "|" + strict + "|" + avecMention();
     if (S.cache && S.cache.key === key) return S.cache.out;
     setStatus("Préparation…");
     const out = await buildOutput();
@@ -1211,7 +1438,7 @@
       const make = async () => {
         let c = finalCanvas(p, masked);
         if (f === "light") c = lighten(c);
-        return blobOf(c, "image/png");
+        return blobOf(avecBande(c, masked), "image/png");
       };
       try {
         await navigator.clipboard.write([new ClipboardItem({ "image/png": make() })]);
@@ -1435,7 +1662,6 @@
 
   /* --------------------------- Cerbère : vérifier ce qui reste visible, avant d'envoyer */
   // Tout se passe ici, sur l'appareil. Les règles et la liste des mots sensibles sont dans rules/cerbere.js.
-  let cerbereOk = -1;        // version du document déjà vérifiée par Cerbère
   let cerbereSuite = null;   // action à faire après le rapport : doShare ou doCopy
   let cerbereItems = [];
 
@@ -1470,8 +1696,78 @@
     return { x: w.bbox.x0 - pad, y: w.bbox.y0 - pad, w: w.bbox.x1 - w.bbox.x0 + 2 * pad, h: w.bbox.y1 - w.bbox.y0 + 2 * pad };
   });
 
+  // Une zone touche-t-elle un endroit masqué ? (on écarte le « bruit » de lecture au bord des zones noires)
+  function presDuMasque(cache, b) {
+    const mx = (b.x1 - b.x0) * 0.25 + 4, my = (b.y1 - b.y0) * 0.4 + 4;
+    for (const x of [b.x0 - mx, (b.x0 + b.x1) / 2, b.x1 + mx]) for (const y of [b.y0 - my, (b.y0 + b.y1) / 2, b.y1 + my]) if (cache(x, y)) return true;
+    return false;
+  }
+
+  // Zones qui ressemblent à de l'écriture (petites taches sombres alignées) mais où aucun mot n'a été lu :
+  // un texte trop petit ou trop flou, une signature, un tampon. Ce que Kerckhoffs ne lit pas, une IA peut souvent le lire.
+  function zonesSansTexte(p, cache) {
+    const k = Math.min(1, 1200 / Math.max(p.img.width, p.img.height));
+    const W = Math.max(1, Math.round(p.img.width * k)), H = Math.max(1, Math.round(p.img.height * k));
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(p.img, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data, lum = new Uint8Array(W * H);
+    let somme = 0;
+    for (let i = 0; i < W * H; i++) { lum[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0; somme += lum[i]; }
+    // Seuil assez haut pour attraper une écriture pâle ou floue, mais relatif au fond (papier blanc ou photo grise).
+    const seuil = Math.min(205, somme / (W * H) - 40);
+    const noir = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) noir[i] = lum[i] < seuil ? 1 : 0;
+    // On retire ce qui est déjà masqué et tous les mots déjà lus.
+    const effacer = (x0, y0, x1, y1) => {
+      for (let yy = Math.max(0, Math.floor(y0 * k)); yy < Math.min(H, Math.ceil(y1 * k)); yy++)
+        for (let xx = Math.max(0, Math.floor(x0 * k)); xx < Math.min(W, Math.ceil(x1 * k)); xx++) noir[yy * W + xx] = 0;
+    };
+    (p.lines || []).forEach((l) => l.words.forEach((w) => { const m = (w.bbox.y1 - w.bbox.y0) * 0.3; effacer(w.bbox.x0 - m, w.bbox.y0 - m, w.bbox.x1 + m, w.bbox.y1 + m); }));
+    for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) if (noir[yy * W + xx] && cache((xx + 0.5) / k, (yy + 0.5) / k)) noir[yy * W + xx] = 0;
+    // Taches sombres, de la taille d'une lettre.
+    const vu = new Uint8Array(W * H), taches = [], pile = [];
+    for (let i = 0; i < W * H; i++) {
+      if (!noir[i] || vu[i]) continue;
+      let x0 = W, y0 = H, x1 = 0, y1 = 0, n = 0;
+      pile.push(i); vu[i] = 1;
+      while (pile.length) {
+        const j = pile.pop(), jx = j % W, jy = (j - jx) / W;
+        n++; if (jx < x0) x0 = jx; if (jx > x1) x1 = jx; if (jy < y0) y0 = jy; if (jy > y1) y1 = jy;
+        for (const v of [j - 1, j + 1, j - W, j + W]) {
+          if (v < 0 || v >= W * H || vu[v] || !noir[v]) continue;
+          if ((v === j - 1 && jx === 0) || (v === j + 1 && jx === W - 1)) continue;
+          vu[v] = 1; pile.push(v);
+        }
+      }
+      const h = y1 - y0 + 1, w = x1 - x0 + 1;
+      if (h >= 2 && h <= 30 && w <= 3 * h + 3 && n >= 3) taches.push({ x0, y0, x1, y1, h });
+      if (taches.length > 4000) return []; // trop de taches : une photo, une texture, pas du texte
+    }
+    // Les taches alignées et rapprochées forment une ligne d'écriture.
+    taches.sort((a, b) => a.x0 - b.x0);
+    const lignes = [];
+    for (const t of taches) {
+      const l = lignes.find((g) => t.x0 - g.x1 <= 1.8 * Math.max(g.h, t.h) && t.x0 >= g.x0 - 2 &&
+        Math.min(g.y1, t.y1) - Math.max(g.y0, t.y0) >= 0.4 * Math.min(g.h, t.h));
+      if (l) { l.x1 = Math.max(l.x1, t.x1); l.y0 = Math.min(l.y0, t.y0); l.y1 = Math.max(l.y1, t.y1); l.h = Math.max(l.h, t.h); l.n++; }
+      else lignes.push({ ...t, n: 1 });
+    }
+    return lignes.filter((l) => l.n >= 5 && l.x1 - l.x0 >= 4 * l.h)
+      .sort((a, b) => b.n - a.n).slice(0, 6)
+      .map((l) => { const m = l.h * 0.5; return { x: (l.x0 - m) / k, y: (l.y0 - m) / k, w: (l.x1 - l.x0 + 1 + 2 * m) / k, h: (l.y1 - l.y0 + 1 + 2 * m) / k }; });
+  }
+
+  // Les combinaisons qui trahissent : un code postal, un âge, le sexe, une information de santé.
+  const COMBINAISON = [
+    { cat: "un code postal", re: /\b(?:[A-Z]{1,2}-)?\d{4,5}\s+[A-ZÀ-Ý][a-zà-ÿ'’-]{2,}/g },
+    { cat: "un âge ou une date de naissance", re: /\b\d{1,3}\s?(?:ans|years?|Jahre)\b|\b(?:âge|age|alter)\s*:?\s*\d{1,3}\b|\b(?:née?|naissance|geboren|born)\b/gi },
+    { cat: "le sexe", re: /\b(?:homme|femme|masculin|féminin|feminin|männlich|weiblich|male|female)\b|\bsexe\s*:?\s*[MFmf]\b/gi },
+  ];
+
   async function analyserCerbere() {
     const items = [];
+    const combinaison = new Map(); // catégorie -> { mots, texte }
     const sensibles = K.cerbere.sensibles.map((s) => ({ ...s, n: s.exact ? s.mot : norm(s.mot) }));
     const detection = rules().concat(S.extra, [{ id: "date", type: "DATE", re: DATE_RE() }]);
     for (const [pi, p] of S.pages.entries()) {
@@ -1501,7 +1797,32 @@
           });
         }
         // Tête 3 : numéros, dates, adresses encore visibles
-        chercher(detection, visibles).forEach((h) => ajouter({ tete: 3, label: "Encore visible : " + h.regle.type.toLowerCase(), texte: h.texte, rects: rectsDe(h.mots) }));
+        const dejaVus = new Set();
+        chercher(detection, visibles).forEach((h) => { dejaVus.add(h.texte); ajouter({ tete: 3, label: "Encore visible : " + h.regle.type.toLowerCase(), texte: h.texte, rects: rectsDe(h.mots) }); });
+        // Tête 3 bis : ce qui a la forme d'un identifiant (lettres et chiffres mêlés, groupes de chiffres…)
+        if (visibles.length) {
+          let raw = ""; const rr = [];
+          visibles.forEach((w, i) => { if (i) raw += " "; rr.push([raw.length, raw.length + w.text.length]); raw += w.text; });
+          for (const c of K.candidatsIdentifiant(raw)) {
+            if (dejaVus.has(c.valeur) || [...vu].some((v) => v.endsWith("|" + c.valeur))) continue;
+            const mots = visibles.filter((w, i) => rr[i][0] < c.fin && rr[i][1] > c.debut);
+            if (mots.length) ajouter({ tete: 3, label: "Ressemble à un identifiant", texte: c.valeur, rects: rectsDe(mots) });
+          }
+          // Les combinaisons qui trahissent
+          for (const g of COMBINAISON) {
+            g.re.lastIndex = 0; let m;
+            while ((m = g.re.exec(raw))) {
+              const mots = visibles.filter((w, i) => rr[i][0] < m.index + m[0].length && rr[i][1] > m.index);
+              if (!mots.length) continue;
+              if (!combinaison.has(g.cat)) combinaison.set(g.cat, { texte: m[0].trim(), mots: [] });
+              combinaison.get(g.cat).mots.push(...mots);
+            }
+          }
+        }
+        // Mots mal lus, hors des bords des zones masquées : le moteur a vu quelque chose sans être sûr de quoi.
+        const malLus = line.words.filter((w) => w.conf != null && w.conf < 60 && /[A-Za-z0-9].*[A-Za-z0-9]/.test(w.text) &&
+          !presDuMasque(cache, w.bbox));
+        if (malLus.length) ajouter({ tete: 4, label: "Lecture incertaine ici", texte: "écriture difficile à lire", rects: rectsDe(malLus), nonLu: true });
         // Tête 2 : mots sensibles (signalés, à laisser si l'IA en a besoin)
         // « e » garde les majuscules ; la lecture confond souvent I et l (« Al » pour « AI ») : on corrige pour les mots courts.
         const brut = (t) => { const s = t.replace(/[.,;:()«»"]/g, ""); return s.length <= 3 ? s.replace(/l/g, "I") : s; };
@@ -1513,6 +1834,10 @@
             if (ok) {
               const mots = texteNorm.slice(i, i + parts.length).map((x) => x.w);
               ajouter({ tete: 2, label: "Mot sensible", texte: s.mot, rects: rectsDe(mots), info: true });
+              if (s.sante) {
+                if (!combinaison.has("une information de santé")) combinaison.set("une information de santé", { texte: s.mot, mots: [] });
+                combinaison.get("une information de santé").mots.push(...mots);
+              }
             }
           }
         }
@@ -1532,6 +1857,15 @@
           });
         } catch (e) { /* pas de lecteur de codes sur cet appareil */ }
       }
+      // Tête 4 : écriture que la lecture n'a pas su lire du tout
+      try {
+        zonesSansTexte(p, cache).forEach((r) => ajouter({ tete: 4, label: "Écriture non lue ici", texte: "texte trop petit, flou, ou manuscrit", rects: [r], nonLu: true }));
+      } catch (e) { /* analyse impossible sur cette image */ }
+      // Deux catégories ou plus encore visibles : on prévient, page par page.
+      if (combinaison.size >= 2) {
+        for (const [cat, v] of combinaison) items.push({ tete: 0, page: pi, label: "Peut identifier avec le reste : " + cat, texte: v.texte, rects: rectsDe(v.mots), combinaison: true });
+      }
+      combinaison.clear();
     }
     return items.sort((a, b) => a.tete - b.tete);
   }
@@ -1540,16 +1874,22 @@
     const ul = $("cerbereList");
     ul.textContent = "";
     const restants = cerbereItems.filter((it) => !it.fait);
-    $("cerbereIntro").textContent = restants.length
-      ? `Cerbère a trouvé ${restants.length} point${restants.length > 1 ? "s" : ""} à vérifier dans ce qui reste visible.`
-      : "Rien à signaler. Vous pouvez envoyer.";
+    const nl = restants.filter((it) => it.nonLu).length;
+    $("cerbereIntro").textContent = (balayageInfo ? balayageInfo + " " : "") + (restants.length
+      ? `${restants.length} point${restants.length > 1 ? "s" : ""} à vérifier dans ce qui reste visible.` +
+        (nl && !strict ? ` Dont ${nl} zone${nl > 1 ? "s" : ""} d'écriture non lue${nl > 1 ? "s" : ""}, en orange sur l'image : ${nl > 1 ? "elles seraient" : "elle serait"} à vérifier en mode strict.` : "")
+      : "Rien à signaler. Vous pouvez envoyer.");
+    $("cerbereAlerte").hidden = !restants.some((it) => it.combinaison);
+    $("cerbereBalayage").hidden = strict;
+    S.orange = restants.filter((it) => it.nonLu);
+    render();
     $("cerbereSend").textContent = strict ? "Aperçu final" : (restants.length ? "Envoyer quand même" : "Envoyer");
     $("cerbereSend").hidden = strict && restants.length > 0; // en mode strict : tout traiter d'abord
     $("cerbereStrictNote").hidden = !(strict && restants.length > 0);
     cerbereItems.forEach((it, i) => {
       if (it.fait) return;
       const li = document.createElement("li");
-      li.className = "cerbere-item";
+      li.className = "cerbere-item" + (it.nonLu ? " non-lu" : "");
       const t = document.createElement("button");
       t.type = "button"; t.className = "cerbere-voir";
       const l = document.createElement("strong"); l.textContent = it.label;
@@ -1580,29 +1920,82 @@
   let strict = false;
   try { strict = localStorage.getItem("kerckhoffs-strict") === "1"; } catch (e) {}
   $("optStrict").checked = strict;
+  $("mentionBloc").hidden = !strict;
   $("optStrict").addEventListener("change", () => {
     strict = $("optStrict").checked;
     try { localStorage.setItem("kerckhoffs-strict", strict ? "1" : "0"); } catch (e) {}
-    cerbereOk = -1;
+    $("mentionBloc").hidden = !strict;
+    if (!strict) $("optMention").checked = true;
+    cerbereOk = -1; render();
+  });
+  $("optMention").addEventListener("change", () => { changed(); });
+
+  let balayageInfo = "", cerbereSansEnvoi = false;
+
+  // Dernier balayage : tout ce qui a été masqué quelque part (par vous ou par Kerckhoffs) est cherché partout ailleurs.
+  async function dernierBalayage() {
+    if (busy) return [];
+    const vus = new Set((S.balayage || []).map((t) => t.key));
+    const ajout = [];
+    const actifs = new Set(S.pages.flatMap((p) => p.boxes.filter((b) => b.active).map((b) => b.token)));
+    for (const t of S.tokens.values()) {
+      if (!actifs.has(t.token) || t.type === "DATE" || t.type === "ZONE") continue;
+      const v = String(t.value).trim();
+      if (v.length < 3) continue;
+      const chiffres = v.replace(/\D/g, "");
+      if (chiffres.length >= 6) {
+        const r = numeroVersRegle(chiffres); r.id = "balayage-" + chiffres; r.type = t.type;
+        if (!S.extra.some((x) => x.id === r.id)) S.extra.push(r);
+        continue;
+      }
+      if (/\d/.test(v) || !K.motsACherche(v).length) continue;
+      const key = t.type + "|" + norm(v);
+      if (vus.has(key)) continue;
+      vus.add(key); ajout.push({ type: t.type, value: v, key });
+    }
+    S.balayage = (S.balayage || []).concat(ajout);
+    const avant = instantane();
+    await detectPages(S.pages, () => "");
+    return nouveaux(avant);
+  }
+  $("cerbereBalayage").addEventListener("click", async () => {
+    $("cerbereBalayage").disabled = true;
+    const items = await dernierBalayage();
+    balayageInfo = items.length ? `Dernier balayage : ${items.length} élément${items.length > 1 ? "s" : ""} de plus masqué${items.length > 1 ? "s" : ""}.` : "Dernier balayage : rien de nouveau.";
+    try { cerbereItems = await analyserCerbere(); } catch (e) {}
+    $("cerbereBalayage").disabled = false;
+    afficherCerbere();
+    if (items.length) montrerTrouves(items, true);
   });
 
-  async function avecCerbere(action) {
+  async function avecCerbere(action, sansEnvoi) {
+    cerbereSansEnvoi = !!sansEnvoi; balayageInfo = "";
+    // Sans masquage, ou document déjà validé et inchangé : on envoie tout de suite, sans contrôle ni animation.
     if (!$("optMask").checked || (cerbereOk === S.version && !strict)) return action();
     let attendu = false;
     if (busy) { // lecture en cours : on attend qu'elle finisse, puis Cerbère vérifie
       attendu = true;
-      setStatus("Lecture du texte en cours, Cerbère vérifie juste après…", true);
+      setStatus("Lecture du texte en cours, le contrôle « Remove Before Flight » suit juste après…", true);
       while (busy) await new Promise((r) => setTimeout(r, 300));
     }
     const direct = !attendu && S.pages.every((p) => p.lines);
+    // En mode strict, le dernier balayage est automatique.
+    if (strict) {
+      setStatus("Dernier balayage…", true);
+      const nv = await dernierBalayage();
+      balayageInfo = nv.length ? `Dernier balayage : ${nv.length} élément${nv.length > 1 ? "s" : ""} de plus masqué${nv.length > 1 ? "s" : ""}.` : "Dernier balayage : rien de nouveau.";
+      if (nv.length) montrerTrouves(nv, true);
+    }
     let items;
-    try { setStatus("Cerbère vérifie ce qui reste visible…", true); items = await analyserCerbere(); }
+    try { setStatus("Vérification de ce qui reste visible…", true); items = await analyserCerbere(); }
     catch (e) { items = []; }
     setStatus("");
     if (!items.length && direct && !strict) {
-      cerbereOk = S.version;
+      cerbereOk = S.version; render();
+      if (sansEnvoi) { await action(); return; }
+      if (animationPossible()) { apresValidation(action); return; }
       await action();
-      setStatus(($("status").textContent + " Cerbère n'a rien trouvé à signaler.").trim());
+      setStatus(($("status").textContent + " Remove Before Flight : rien à signaler, bon vol.").trim());
       return;
     }
     cerbereItems = items; cerbereSuite = action;
@@ -1610,14 +2003,124 @@
     $("cerbere").hidden = false; // sans voile sombre : l'image reste visible au-dessus
     afficherCerbere();
   }
-  function fermerCerbere() { $("cerbere").hidden = true; $("backdrop").hidden = true; S.flash = null; render(); }
+  function fermerCerbere() { $("cerbere").hidden = true; $("backdrop").hidden = true; S.flash = null; S.orange = null; render(); }
   $("cerbereBack").addEventListener("click", fermerCerbere);
   $("cerbereSend").addEventListener("click", () => {
     const suite = cerbereSuite;
-    cerbereOk = S.version; fermerCerbere();
-    if (strict) { ouvrirApercu(suite); return; }
-    if (suite) suite(); // appelé directement dans le toucher : le partage et la copie restent autorisés
+    cerbereOk = S.version; fermerCerbere(); // fermerCerbere redessine : le filigrane disparaît
+    if (cerbereSansEnvoi) { if (suite) suite(); return; }
+    apresValidation(suite);
   });
+
+  /* ---------------- le document part : les zones masquées tombent comme du sable, puis l'image envoyée se pose */
+  let animOn = true;
+  try { animOn = localStorage.getItem("kerckhoffs-animation") !== "0"; } catch (e) {}
+  const reduireMouvements = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const animationPossible = () => animOn && !reduireMouvements() && $("optMask").checked && !!page();
+  function majAnim() {
+    $("animToggle").setAttribute("aria-pressed", String(animOn));
+    $("animToggle").title = animOn ? "Animation avant l'envoi : activée. Toucher pour la couper." : "Animation avant l'envoi : coupée. Toucher pour la remettre.";
+    $("optAnim").checked = animOn;
+  }
+  function choisirAnim(v) { animOn = v; try { localStorage.setItem("kerckhoffs-animation", v ? "1" : "0"); } catch (e) {} majAnim(); }
+  majAnim();
+  $("animToggle").addEventListener("click", () => {
+    choisirAnim(!animOn);
+    setStatus(animOn ? "Animation avant l'envoi : activée." : "Animation avant l'envoi : coupée. Ce choix est gardé, même après une nouvelle version.");
+  });
+  $("optAnim").addEventListener("change", () => choisirAnim($("optAnim").checked));
+
+  // Après la validation : l'animation, puis un bouton « Envoyer » (le menu de partage du téléphone exige un toucher).
+  let envolSuite = null;
+  function apresValidation(suite) {
+    if (!suite) return;
+    if (!animationPossible()) { if (strict) ouvrirApercu(suite); else suite(); return; }
+    jouerEnvol().then(() => {
+      if (strict) { fermerEnvol(); ouvrirApercu(suite); return; }
+      envolSuite = suite;
+      $("envolEnvoyer").textContent = suite === doCopy ? "Copier" : suite === doSave ? "Enregistrer" : "Envoyer";
+      $("envolBar").hidden = false; $("envolPasser").hidden = true;
+    });
+  }
+  function fermerEnvol() { $("envol").hidden = true; envolSuite = null; }
+  $("envolRevenir").addEventListener("click", fermerEnvol);
+  $("envolEnvoyer").addEventListener("click", () => { const s2 = envolSuite; fermerEnvol(); if (s2) s2(); });
+
+  function jouerEnvol() {
+    return new Promise((fini) => {
+      const p = page(), ov = $("envol"), cvE = $("envolCv");
+      ov.hidden = false; $("envolBar").hidden = true; $("envolPasser").hidden = false;
+      const dpr = Math.min(2, window.devicePixelRatio || 1), W = ov.clientWidth, Ht = ov.clientHeight, H = Ht - 150;
+      cvE.width = Math.round(W * dpr); cvE.height = Math.round(Ht * dpr);
+      const x = cvE.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const s = Math.min((W - 24) / p.img.width, (H - 24) / p.img.height);
+      const ox = (W - p.img.width * s) / 2, oy = 12 + (H - 24 - p.img.height * s) / 2, pw = p.img.width * s, ph = p.img.height * s;
+      // L'image qui partira, et le papier « troué » : l'original, avec les zones masquées en blanc.
+      const fin = avecBande(finalCanvas(p, true), true);
+      const papier = document.createElement("canvas"); papier.width = p.img.width; papier.height = p.img.height;
+      const px = papier.getContext("2d"); px.drawImage(p.img, 0, 0);
+      p.strokes.forEach((st) => strokePath(px, st, "#fff"));
+      px.fillStyle = "#fff";
+      const zones = [];
+      p.boxes.filter((b) => b.active).forEach((b) => (b.rects || [b]).forEach((r) => { px.fillRect(r.x, r.y, r.w, r.h); zones.push(r); }));
+      p.strokes.forEach((st) => {
+        if (st.kind === "rect") zones.push(st);
+        else { const xs = st.pts.map((q) => q[0]), ys = st.pts.map((q) => q[1]), m = st.w / 2; zones.push({ x: Math.min(...xs) - m, y: Math.min(...ys) - m, w: Math.max(...xs) - Math.min(...xs) + st.w, h: Math.max(...ys) - Math.min(...ys) + st.w }); }
+      });
+      // Les grains de sable : de simples taches noires, prises dans les zones masquées. Jamais les vraies lettres.
+      const cache = couvert(p);
+      const aire = zones.reduce((a, r) => a + Math.max(0, r.w) * Math.max(0, r.h), 0);
+      const pas = Math.max(2, Math.sqrt(aire / 3500));
+      const gx = [], gy = [];
+      zones.forEach((r) => {
+        for (let yy = r.y; yy < r.y + r.h; yy += pas) for (let xx = r.x; xx < r.x + r.w; xx += pas) if (cache(xx + pas / 2, yy + pas / 2)) { gx.push(xx); gy.push(yy); }
+      });
+      const n = Math.min(gx.length, 6000);
+      let xmin = Infinity, xmax = -Infinity;
+      for (let i = 0; i < n; i++) { if (gx[i] < xmin) xmin = gx[i]; if (gx[i] > xmax) xmax = gx[i]; }
+      if (!n) { xmin = 0; xmax = 1; }
+      const depart = new Float32Array(n), vx = new Float32Array(n), vy = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        depart[i] = 0.75 + ((gx[i] - xmin) / (xmax - xmin + 1)) * 0.45 + Math.random() * 0.2; // le coup de vent passe de gauche à droite
+        vx[i] = (30 + Math.random() * 90); vy[i] = -Math.random() * 80;
+      }
+      const taille = Math.max(1.5, pas * s * 1.1), g = 1500, duree = 2.5;
+      let t0 = null, finiTot = false;
+      const finir = () => { if (finiTot) return; finiTot = true; dessiner(duree + 1); fini(); };
+      const passer = () => finir();
+      $("envolPasser").onclick = passer; cvE.onclick = passer;
+      function dessiner(t) {
+        x.clearRect(0, 0, W, Ht);
+        // 1. le papier revient, sauf les zones masquées
+        const aP = Math.min(1, Math.max(0, (t - 0.15) / 0.45));
+        x.globalAlpha = aP; x.fillStyle = "#fff"; x.fillRect(ox, oy, pw, ph); x.drawImage(papier, ox, oy, pw, ph);
+        // 2. les grains : d'abord en place (le noir des zones masquées), puis ils tombent
+        x.globalAlpha = 1; x.fillStyle = "#000";
+        for (let i = 0; i < n; i++) {
+          const dt = t - depart[i];
+          let X = ox + gx[i] * s, Y = oy + gy[i] * s, tl = taille;
+          if (t < 0.15) continue;
+          if (dt > 0) { X += vx[i] * dt; Y += vy[i] * dt + 0.5 * g * dt * dt; tl = taille * Math.max(0.4, 1 - dt * 0.6); }
+          if (Y > Ht + 10) continue;
+          x.fillRect(X, Y, tl, tl);
+        }
+        // 3. l'image qui part se pose
+        const aF = Math.min(1, Math.max(0, (t - 1.85) / 0.5));
+        if (aF > 0) { x.globalAlpha = aF; x.drawImage(fin, ox, oy, pw, (fin.height / fin.width) * pw); x.globalAlpha = 1; }
+        // 0. le flash
+        const aFl = Math.max(0, 1 - t / 0.3);
+        if (aFl > 0) { x.globalAlpha = aFl; x.fillStyle = "#fff"; x.fillRect(0, 0, W, Ht); x.globalAlpha = 1; }
+      }
+      const pas2 = (ts) => {
+        if (finiTot) return;
+        if (t0 === null) t0 = ts;
+        const t = (ts - t0) / 1000;
+        dessiner(t);
+        if (t >= duree) finir(); else requestAnimationFrame(pas2);
+      };
+      requestAnimationFrame(pas2);
+    });
+  }
 
   // Aperçu final (mode strict) : exactement ce qui va partir, page par page.
   let apercuSuite = null;
@@ -1629,6 +2132,7 @@
     S.pages.forEach((p) => {
       let c = finalCanvas(p, masked);
       if (f === "light") c = lighten(c);
+      c = avecBande(c, masked);
       const img = document.createElement("img");
       img.src = c.toDataURL("image/jpeg", 0.8);
       img.alt = "Aperçu de la page envoyée";
@@ -1639,13 +2143,13 @@
     $("apercu").hidden = false;
   }
   $("apercuOk").addEventListener("change", () => { $("apercuSend").disabled = !$("apercuOk").checked; });
-  $("apercuBack").addEventListener("click", () => { $("apercu").hidden = true; cerbereOk = -1; });
+  $("apercuBack").addEventListener("click", () => { $("apercu").hidden = true; cerbereOk = -1; render(); });
   $("apercuSend").addEventListener("click", () => {
     $("apercu").hidden = true;
     const suite = apercuSuite; apercuSuite = null;
     if (suite) suite();
   });
-  $("btnCerbere").addEventListener("click", () => { cerbereOk = -1; closeSheet(); avecCerbere(() => setStatus("Cerbère : rien d'autre à signaler.")); });
+  $("btnCerbere").addEventListener("click", () => { cerbereOk = -1; closeSheet(); avecCerbere(() => setStatus("Remove Before Flight : rien d'autre à signaler."), true); });
 
   /* ------------------------------------------------------------ exemple */
   function demoPage() {
@@ -1677,7 +2181,7 @@
     return newPage(c, "exemple.png");
   }
   $("goDemo").addEventListener("click", () => {
-    openWork("folder");
+    openWork();
     $("tNames").value = "Jean Exemple";
     $("tAddr").value = "Rue du Lac 12, 1003 Lausanne";
     const p = demoPage();
@@ -1688,11 +2192,19 @@
     detectPages([p]);
   });
 
-  $("goQuick").addEventListener("click", () => openWork("quick"));
-  $("goFolder").addEventListener("click", () => openWork("folder"));
+  // Accueil : photographier tout de suite, ou importer un document (photo déjà prise, image ou PDF).
+  $("goCam").addEventListener("click", () => { openWork(); ouvrirCamera(); });
+  $("goImport").addEventListener("click", () => { openWork(); $("inFile").click(); });
+
+  // Outils : pinceau, rectangle et retour toujours visibles ; déplacer, recadrer et gomme derrière « Plus ».
+  $("toolPlus").addEventListener("click", () => {
+    const ouvert = $("toolbar").classList.toggle("plus-ouvert");
+    $("toolPlus").setAttribute("aria-expanded", String(ouvert));
+    $("toolPlusTexte").textContent = ouvert ? "Moins" : "Plus";
+  });
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.6.1";
+  const VERSION_APP = "0.7.0";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
@@ -1726,7 +2238,17 @@
   // Le contrôle des signatures est dans verification.js. Ici, on ne fait que l'appeler et afficher le résultat.
   const V = window.KerckhoffsVerification;
   const CACHE_ACTUEL = "kerckhoffs-v" + VERSION_APP;
+  // L'écran de vérification dit d'abord l'essentiel en une ligne ; les détails sont sous « En savoir plus ».
+  function statut(texte, etat) { const el = $("verStatut"); el.textContent = texte; el.className = "verif-statut" + (etat ? " " + etat : ""); }
+  const surAdresseOfficielle = () => {
+    const o = new URL(ADRESSE_OFFICIELLE);
+    return location.host === o.host && location.pathname.startsWith(o.pathname);
+  };
   function afficherEmpreinte(r) {
+    if (!r || r.absente) statut("Vérification possible dans un instant : rouvrez Kerckhoffs.");
+    else if (!r.ok) statut("Attention : cette version n'est PAS signée par l'auteur. Ne l'utilisez pas.", "ko");
+    else if (!surAdresseOfficielle()) statut("Signée par l'auteur ✓, mais ouverte depuis une autre adresse que l'adresse officielle. Voir « En savoir plus ».", "ko");
+    else statut("Version officielle ✓ Signée par l'auteur.", "ok");
     const el = $("verEmpreinte");
     if (!r || r.absente) { el.textContent = "disponible une fois l'application gardée sur l'appareil : rouvrez-la dans un instant"; el.className = "empreinte"; return; }
     el.textContent = r.ok ? `${r.empreinte} · signée par l'auteur ✓` : `${r.empreinte ? r.empreinte + " · " : ""}NON signée : ${r.raison}`;
@@ -1804,6 +2326,7 @@
     const el = $("verEmpreinte");
     el.textContent = "fichier figé : vérifiez-le avec sa signature, publiée dans VERSIONS.md";
     el.className = "empreinte";
+    statut("Version figée : vérifiez ce fichier avec sa signature, publiée dans la liste officielle des versions.");
   } else {
     st.textContent = "Ouvrez Kerckhoffs depuis son adresse web pour l'utiliser hors ligne";
     afficherEmpreinte(null);

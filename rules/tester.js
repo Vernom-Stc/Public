@@ -88,6 +88,17 @@ for (const [lu, cherche] of K.exemplesRessemblance.trouve) if (!K.ressemble(lu, 
 for (const [lu, cherche] of K.exemplesRessemblance.ignore) if (K.ressemble(lu, cherche) && K.motsACherche(cherche).length) ko(`« ${lu} » ne devrait pas être pris pour « ${cherche} »`);
 if (K.motsACherche("12 rue Louis-De-Montfalcon").join(",") !== "Louis,Montfalcon") ko(`motsACherche : obtenu « ${K.motsACherche("12 rue Louis-De-Montfalcon")} »`);
 
+console.log("Identifiants reconnus à leur forme");
+for (const t of K.exemplesIdentifiant.masque) if (K.formeIdentifiant(t) !== 2) ko(`« ${t} » devrait être masqué d'office (niveau obtenu : ${K.formeIdentifiant(t)})`);
+for (const t of K.exemplesIdentifiant.aVerifier) if (K.formeIdentifiant(t) !== 1) ko(`« ${t} » devrait être signalé à vérifier (niveau obtenu : ${K.formeIdentifiant(t)})`);
+for (const t of K.exemplesIdentifiant.ignore) if (K.formeIdentifiant(t) !== 0) ko(`« ${t} » ne devrait pas ressembler à un identifiant (niveau obtenu : ${K.formeIdentifiant(t)})`);
+{
+  const l = "N° contribuable 1234 5678 9012, dossier MAT-2024-0012 du 12.03.2024, montant 1'500.00";
+  const v = K.candidatsIdentifiant(l).map((c) => c.valeur);
+  for (const att of ["1234 5678 9012", "MAT-2024-0012"]) if (!v.includes(att)) ko(`candidatsIdentifiant : « ${att} » manque (obtenu : ${v.join(" | ")})`);
+  if (v.some((x) => /12\.03|1'500/.test(x))) ko(`candidatsIdentifiant : date ou montant pris pour un identifiant (${v.join(" | ")})`);
+}
+
 // Le modèle doit rester valide, puisqu'on le copie.
 const modele = charger(["rules/pays/_modele.js"]);
 for (const code of Object.keys(modele.pays)) tester("Modèle (_modele.js)", modele.pays[code].regles);

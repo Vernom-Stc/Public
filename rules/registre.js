@@ -106,6 +106,57 @@
       return s.length >= 3 && COURANTS.indexOf(s) < 0 && !/^[0-9oisbz]{1,3}$/.test(s);
     });
   };
+  /* ---- Reconnaître un identifiant à sa forme, dans n'importe quel pays ----
+   * On ne connaît pas les documents de chaque pays. Mais un numéro de dossier, de patient ou de contribuable
+   * a une forme reconnaissable : assez long, plusieurs chiffres, des lettres et des chiffres mêlés, des séparateurs répétés.
+   * Chaque signal rapporte des points :
+   *   lettres ET chiffres mêlés : 2   ·   au moins trois blocs (lettres / chiffres / séparés) : 1
+   *   deux séparateurs ou plus : 1     ·   8 caractères utiles ou plus : 1   ·   12 ou plus : 1
+   * 4 points ou plus : masqué d'office.  2 ou 3 points : signalé « à vérifier » avant l'envoi.
+   * Jamais : les dates, les montants, les heures, les années seules, les numéros de version.
+   */
+  var DATE_SIMPLE = /^(?:\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4}|\d{4}[.\/-]\d{1,2}[.\/-]\d{1,2})$/;
+  var MONTANT = /^\d{1,3}(?:['’ ]\d{3})*(?:[.,]\d{1,2})?$|^\d+[.,]\d{2}$/;
+  K.formeIdentifiant = function (texte) {
+    var t = String(texte).trim().replace(/[,;:)]+$/, "").replace(/^[(]+/, "");
+    if (DATE_SIMPLE.test(t) || MONTANT.test(t)) return 0;
+    var utile = t.replace(/[\s.\-\/_]/g, "");
+    if (!/^[A-Za-z0-9]+$/.test(utile) || utile.length < 6) return 0;
+    var chiffres = (utile.match(/\d/g) || []).length, lettres = utile.length - chiffres;
+    if (chiffres < 3) return 0;
+    var seps = (t.match(/[\s.\-\/_]/g) || []).length;
+    var blocs = t.split(/[\s.\-\/_]+/).reduce(function (n, b) { return n + (b.match(/[A-Za-z]+|\d+/g) || []).length; }, 0);
+    var points = 0;
+    if (lettres > 0) points += 2;
+    if (blocs >= 3) points += 1;
+    if (seps >= 2) points += 1;
+    if (utile.length >= 8) points += 1;
+    if (utile.length >= 12) points += 1;
+    return points >= 4 ? 2 : points >= 2 ? 1 : 0;
+  };
+  // Cherche dans une ligne les candidats : un mot fait de lettres, chiffres et séparateurs,
+  // ou des groupes de chiffres séparés par des espaces (« 1234 5678 9012 »). Renvoie [{ debut, fin, valeur, niveau }].
+  K.candidatsIdentifiant = function (ligne) {
+    var out = [], pris = [];
+    var essayer = function (re) {
+      re.lastIndex = 0; var m;
+      while ((m = re.exec(ligne))) {
+        var v = m[0].replace(/[.,;:\-\/]+$/, ""), d = m.index, f = d + v.length;
+        if (pris.some(function (p) { return p[0] < f && p[1] > d; })) continue;
+        var n = K.formeIdentifiant(v);
+        if (n) { out.push({ debut: d, fin: f, valeur: v, niveau: n }); pris.push([d, f]); }
+      }
+    };
+    essayer(/(?<![\w.,'’@])\d{2,6}(?: \d{2,6}){2,5}(?![\w'’@]|[.,]\d)/g);
+    essayer(/(?<![\w@.'’-])[A-Za-z0-9](?:[A-Za-z0-9]|[.\-\/_](?=[A-Za-z0-9]))+(?![\w@'’-])/g);
+    return out;
+  };
+  K.exemplesIdentifiant = {
+    masque: ["MAT-2024-0012", "ABCDE1234F", "1234 5678 9012", "AKO270MXN", "BE-2019-00042-X"],
+    aVerifier: ["X7K2P9", "SR-48213"],
+    ignore: ["12.03.2024", "1'500.00", "412.30", "2026", "Lausanne", "covid19", "0.6.2", "2026-2027", "H2O", "18:26:36", "jean.exemple"],
+  };
+
   K.exemplesRessemblance = {
     trouve: [["AKO270MXN", "AKQ278MXN"], ["DUP0NT", "Dupont"], ["Montfalcon,", "MONTFALCON"], ["Léman", "leman"], ["Martln", "Martin"]],
     ignore: [["Dupond", "Dupuis"], ["Paul", "Pail"], ["rue", "rue"], ["Marc", "Mars"], ["Lausanne", "Lucerne"]],
