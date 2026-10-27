@@ -79,6 +79,7 @@
         <button class="btn small" id="trouvesFermer" type="button" aria-label="Fermer">✕</button>
       </div>
       <div class="pile-boutons">
+        <button class="style-chip" id="styleChip" type="button" hidden></button>
         <button class="fit" id="fit" type="button" hidden>Ajuster</button>
         <button class="btn small chercher-ici" id="chercherIci" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg> Rechercher ici</button>
       </div>
@@ -121,10 +122,17 @@
         <button class="btn ghost" id="emptyColler" type="button" hidden>Coller une capture (Ctrl+V)</button>
       </div>
     </div>
+    <div class="rbf-un" id="rbfUn" hidden>
+      <div class="rbf-un-texte"><strong id="rbfUnLabel"></strong><span id="rbfUnTexte"></span></div>
+      <div class="cerbere-act">
+        <button class="btn small dark" id="rbfUnMasquer" type="button">Masquer</button>
+        <button class="btn small" id="rbfUnLaisser" type="button">Laisser</button>
+      </div>
+    </div>
     <div class="depot" id="depot" hidden><p>Déposez le document ici</p></div>
 
     <!-- Les quatre coins -->
-    <button class="coin coin-hg" id="undo" type="button" aria-label="Annuler le dernier geste" title="Annuler le dernier geste (Ctrl+Z)"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg></button>
+    <button class="coin coin-hg" id="undo" type="button" aria-label="Annuler le dernier geste" title="Annuler le dernier geste (Ctrl+Z)"><svg class="icone-annuler" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg><svg class="icone-liste" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/><path d="M19 6v2M19 11v2M19 16v2"/></svg></button>
     <button class="coin coin-hd" id="coinMove" type="button" aria-pressed="false" aria-label="Déplacer la feuille" title="Déplacer la feuille (M, ou barre d'espace)"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
     <button class="coin coin-bg" id="btnOpts" type="button" aria-label="Menu : envoyer et autres outils" title="Menu"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <button class="coin coin-bd" id="coinDoigt" type="button" aria-pressed="true" aria-label="Effacer au doigt" title="Effacer au doigt (D)"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V4.5a1.5 1.5 0 013 0V10"/><path d="M12 9.5V8a1.5 1.5 0 013 0v2.5"/><path d="M15 10a1.5 1.5 0 013 0v4.5c0 3.6-2.5 6.5-6 6.5h-.6c-2 0-3.4-.8-4.6-2.3L4.3 15a1.5 1.5 0 012.3-1.9L9 15"/></svg></button>
@@ -218,8 +226,11 @@
       <p class="hint">En Normal, la mention reste toujours. En Strict, vous pouvez la retirer.</p>
       <fieldset class="choix-niveau">
         <legend>Ce qui recouvre les données</legend>
-        <label class="check"><input type="radio" name="style" value="noir" id="styleNoir" checked> Noir</label>
-        <label class="check"><input type="radio" name="style" value="flou" id="styleFlou"> Flou opaque : une tache de la couleur moyenne, sans rien dessous</label>
+        <label class="check"><input type="radio" name="style" value="auto" id="styleAuto" checked> Automatique : couleur du papier pour un document, flou opaque pour une photo</label>
+        <label class="check"><input type="radio" name="style" value="papier" id="stylePapier"> Couleur du papier, partout</label>
+        <label class="check"><input type="radio" name="style" value="flou" id="styleFlou"> Flou opaque, partout : une tache de la couleur moyenne</label>
+        <label class="check"><input type="radio" name="style" value="noir" id="styleNoir"> Noir, partout</label>
+        <p class="hint">Dans tous les cas, il n'y a plus rien dessous : le document envoyé est une image neuve.</p>
       </fieldset>
       <label class="check"><input type="checkbox" id="optGaucher"> Je suis gaucher : boutons en miroir</label>
       <label class="check" id="camDirecteBloc"><input type="checkbox" id="optCamDirecte" checked> Ouvrir directement l'appareil photo</label>
@@ -249,7 +260,7 @@
     <p class="rbf-alerte" id="cerbereAlerte" hidden><strong>Attention :</strong> un code postal, un âge, le sexe, une situation (chômage, licenciement) ou une maladie rare suffisent souvent à retrouver une personne, même sans son nom. Si plusieurs de ces informations restent visibles, masquez-en au moins une avant d'envoyer.</p>
     <p id="cerbereIntro"></p>
     <ul class="cerbere-list" id="cerbereList"></ul>
-    <p class="hint">Touchez un point pour le voir sur l'image. Rien n'est masqué sans vous : vous décidez.</p>
+    <p class="hint" id="cerbereAide">Touchez un point : l'image montre où il est. Touchez deux fois : il reste seul en bas, avec presque tout l'écran pour la photo.</p>
     <p class="hint strict-note" id="cerbereStrictNote" hidden>Niveau Strict : traitez chaque point (Masquer ou Laisser) pour continuer.</p>
     <p class="rbf-mention" id="cerbereMention"></p>
     <button class="btn" id="cerbereBalayage" type="button">Dernier balayage : chercher partout ce qui est déjà masqué</button>

@@ -157,8 +157,45 @@
     ignore: ["12.03.2024", "1'500.00", "412.30", "2026", "Lausanne", "covid19", "0.6.2", "2026-2027", "H2O", "18:26:36", "jean.exemple"],
   };
 
+  /* ---- Les mots courants du français : jamais cherchés « à peu près » ----
+   * « Tous les pareils » tolère les erreurs de lecture. Mais un mot courant (« attente », « plutôt », « locataires »)
+   * ne doit être trouvé que s'il est écrit exactement pareil, et une zone faite seulement de mots courants
+   * est proposée décochée : ce sont des mots ordinaires, pas des données privées.
+   * La liste est volontairement courte et peut être complétée, langue par langue. */
+  var COURANTS_FR = ("a ai as au aux avec avez avons ce ces cet cette ceux chez comme dans de des du elle elles en entre est et été être " +
+    "il ils je la le les leur leurs lui ma mais me mes moi mon ne nos notre nous on ou où par pas pour qu que qui sa sans se ses si son " +
+    "sont sur ta te tes toi ton tous tout toute toutes tu un une vos votre vous " +
+    "afin ainsi alors après assez aucun aussi autre autres avant bien bon bonne car cela celle celui chaque ci contre déjà depuis donc " +
+    "dont encore ensuite faire fait fois hors ici jamais jusqu là lors lorsque même mêmes moins non peu peut plus plusieurs plutôt " +
+    "pourquoi pourtant près puis quand quel quelle quelque quelques rien selon seul seule seulement sous souvent suite tant toujours très " +
+    "trop vers voici voilà oui " +
+    "madame monsieur mesdames messieurs mademoiselle cher chère chers chères salutations sentiments distingués distinguées assurance " +
+    "attente réponse demande lettre courrier correspondance annexe annexes copie objet concerne référence références dossier dossiers " +
+    "date dates jour jours mois année années semaine heure heures matin soir journée journées " +
+    "adresse adresses téléphone tél fax mail email courriel site page pages nom noms prénom prénoms numéro numéros " +
+    "association société entreprise office service services bureau direction administration commune canton ville rue route avenue " +
+    "chemin place case postale locataire locataires bailleur bailleresse régie propriétaire propriétaires loyer loyers bail logement " +
+    "contrat contrats facture factures montant total prix frais paiement compte banque " +
+    "enseignant enseignants enseignante enseignantes formateur formatrice module modules cours thème session sessions " +
+    "titulaire brevet diplôme formation patient patiente médecin docteur client cliente madame " +
+    "comme convenu nos vos informés informé informée prions croire veuillez agréer recevoir trouverez tiendrons sera seront donnée donné").split(" ");
+  var DICO_COURANT = {};
+  COURANTS_FR.forEach(function (m) { DICO_COURANT[simplifier(m)] = true; });
+  K.estCourant = function (mot) { var s = simplifier(mot); return !!s && DICO_COURANT[s] === true; };
+  // Une zone faite seulement de mots courants : rien de privé, a priori.
+  K.queDesMotsCourants = function (texte) {
+    var mots = String(texte).split(/[\s,;:.'’()\/-]+/).filter(function (m) { return simplifier(m).length > 0; });
+    return mots.length > 0 && mots.every(function (m) { return K.estCourant(m) || /^\d{1,2}$/.test(m); });
+  };
+  // Ressemblance prudente : un mot lu qui est un mot courant ne « ressemble » pas, il doit être identique.
+  var ressembleLarge = K.ressemble;
+  K.ressemble = function (motLu, motCherche) {
+    if (K.estCourant(motLu)) return simplifier(motLu) === simplifier(motCherche);
+    return ressembleLarge(motLu, motCherche);
+  };
+
   K.exemplesRessemblance = {
     trouve: [["AKO270MXN", "AKQ278MXN"], ["DUP0NT", "Dupont"], ["Montfalcon,", "MONTFALCON"], ["Léman", "leman"], ["Martln", "Martin"]],
-    ignore: [["Dupond", "Dupuis"], ["Paul", "Pail"], ["rue", "rue"], ["Marc", "Mars"], ["Lausanne", "Lucerne"]],
+    ignore: [["Dupond", "Dupuis"], ["Paul", "Pail"], ["rue", "rue"], ["Marc", "Mars"], ["Lausanne", "Lucerne"], ["locataires", "Locataire"], ["attente", "attentes"]],
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -397,3 +397,33 @@ details.group:not([open]){gap:0}
 #undo.coin{border-radius:50%;border:1px solid rgba(255,255,255,.45)}
 .btn.primary .avion{color:currentColor}
 @media (min-width:900px){ .editor.panneau .viewport{margin-right:440px} .editor.panneau .backdrop{background:transparent} }
+.style-chip{border:0;border-radius:999px;padding:4px 12px;background:rgba(255,255,255,.9);color:#14202b;font:600 .8rem var(--ui);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+/* Sur le téléphone : les choix du rectangle (et de Recadrer, Référencer) sur une seule ligne, en bas, entre le menu et le doigt */
+@media (max-width:899px){
+  .selbar{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:80px;right:80px;flex-wrap:nowrap;justify-content:flex-start;
+    overflow-x:auto;overscroll-behavior:contain;scrollbar-width:none;padding:4px;border-radius:14px;background:rgba(20,32,43,.78);
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);gap:6px}
+  .selbar::-webkit-scrollbar{display:none}
+  .selbar .btn{flex:0 0 auto;min-height:48px;padding:6px 12px;font-size:.86rem}
+  .selbar .refbar-titre{flex:0 0 auto;padding:0 4px}
+  .editor:has(.selbar:not([hidden])) .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .editor:has(.selbar:not([hidden])) .cherche-panel{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+}
+.icone-liste{display:none}
+.mode-un #undo .icone-annuler{display:none}
+.mode-un #undo .icone-liste{display:block}
+.mode-un #undo{background:rgba(192,57,43,.85);border-color:#fff}
+.rbf-un{position:absolute;left:80px;right:80px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:7;display:flex;gap:8px;align-items:center;
+  padding:8px 10px;border-radius:14px;background:var(--sheet);color:var(--ink);border:1px solid #f0b3ac;box-shadow:0 4px 16px rgba(0,0,0,.35)}
+.rbf-un-texte{flex:1;min-width:0;display:grid;gap:2px}
+.rbf-un-texte strong{font-size:.86rem}
+.rbf-un-texte span{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+@media (max-width:520px){.rbf-un{left:10px;right:10px;bottom:calc(84px + env(safe-area-inset-bottom,0px));flex-wrap:wrap}}
+.cerbere-plus{font-size:.84rem;color:var(--muted);text-align:center}
+@media (max-width:899px){
+  .cerbere{max-height:44vh;max-height:44dvh;gap:10px;padding-top:10px}
+  .cerbere .ruban{padding:5px 8px;font-size:.76rem}
+  .crop-screen{left:80px;right:80px;top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));white-space:normal}
+}
+.pile-boutons{flex-wrap:wrap;justify-content:flex-end}
+.style-chip{padding:3px 10px;font-size:.74rem;opacity:.92}
