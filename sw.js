@@ -7,7 +7,7 @@
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.7.0";
+const VERSION = "kerckhoffs-v0.8.0";
 const FILES = [
   "./",
   "index.html",
@@ -86,6 +86,25 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) {
     e.respondWith(Response.error()); // aucune sortie vers un autre site
+    return;
+  }
+  // « Partager » vers Kerckhoffs (Android) : le téléphone remet le fichier ici. Il est gardé un instant sur l'appareil,
+  // le temps que la page l'ouvre (puis elle l'efface aussitôt). Rien ne sort de l'appareil.
+  if (e.request.method === "POST" && url.pathname.endsWith("/partage")) {
+    e.respondWith((async () => {
+      try {
+        const fd = await e.request.formData();
+        await caches.delete("kerckhoffs-partage");
+        const c = await caches.open("kerckhoffs-partage");
+        let i = 0;
+        for (const f of fd.getAll("fichiers")) {
+          if (!f || typeof f === "string" || !f.size) continue;
+          await c.put(new URL("partage/" + i++, self.registration.scope).href,
+            new Response(f, { headers: { "content-type": f.type || "application/octet-stream", "x-nom": encodeURIComponent(f.name || "document") } }));
+        }
+      } catch (err) { /* rien à ouvrir */ }
+      return Response.redirect(new URL("./?partage=1", self.registration.scope).href, 303);
+    })());
     return;
   }
   if (e.request.method !== "GET") return;

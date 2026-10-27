@@ -28,16 +28,20 @@
   <div class="choices">
     <button class="btn primary big" id="goCam" type="button">Photographier un document</button>
     <button class="btn big" id="goImport" type="button">Importer un document<span class="sous-btn">photo déjà prise, image ou PDF</span></button>
+    <div class="choices-pc" id="choixPC" hidden>
+      <button class="btn" id="goColler" type="button">Coller une capture<span class="sous-btn">Ctrl+V</span></button>
+      <button class="btn" id="goCapture" type="button">Capturer l'écran<span class="sous-btn">une fenêtre ou un onglet</span></button>
+    </div>
   </div>
-  <p class="hint">Kerckhoffs repère les noms et les numéros tout seul. Vous relisez, vous complétez au doigt, puis vous envoyez.</p>
+  <p class="hint">Kerckhoffs repère les noms et les numéros tout seul. Vous relisez, vous complétez au doigt, puis vous envoyez. Sur un ordinateur, vous pouvez aussi glisser un fichier sur cette page.</p>
 
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
   </p>
 
   <section class="install" id="installBloc">
-    <h2>Installez Kerckhoffs sur votre téléphone</h2>
-    <p>Dans votre navigateur, menu ⋮ → « Ajouter à l'écran d'accueil ». Ouvrez ensuite toujours Kerckhoffs par son icône.</p>
+    <h2>Installez Kerckhoffs</h2>
+    <p>Sur un téléphone : menu ⋮ du navigateur → « Ajouter à l'écran d'accueil ». Sur un ordinateur (Chrome ou Edge) : l'icône d'installation dans la barre d'adresse. Ouvrez ensuite toujours Kerckhoffs par son icône.</p>
     <button class="btn primary" id="btnInstaller" type="button" hidden>Installer Kerckhoffs</button>
   </section>
 
@@ -51,42 +55,34 @@
     <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page. Ouvrez-la dans votre navigateur, pas depuis une autre application.</p>
     <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
     <p class="home-links"><button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button></p>
-    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.7.0.html" download>Version figée, pour les usages sensibles</a></p>
+    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.8.0.html" download>Version figée, pour les usages sensibles</a></p>
   </details>
-  <p class="fineprint">Version 0.7.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.8.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
-<!-- ============ ESPACE DE TRAVAIL : tout tient sur un écran, sans défiler ============ -->
+<!-- ============ ESPACE DE TRAVAIL : la feuille en plein écran, quatre boutons aux quatre coins ============ -->
 <main id="work" class="editor" hidden>
-  <header class="bar">
-    <button class="icon-btn" id="back" type="button" aria-label="Retour à l'accueil">Accueil</button>
-    <h2 id="workTitle">Document</h2>
-    <span class="pageinfo" id="pageInfo"></span>
-    <button class="icon-btn anim-btn" id="animToggle" type="button" aria-pressed="true" aria-label="Animation avant l'envoi" title="Animation avant l'envoi"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="6" y="11" width="2.4" height="2.4"/><rect x="11" y="10" width="2.4" height="2.4"/><rect x="16" y="12" width="2.4" height="2.4"/><rect x="8" y="16" width="2" height="2"/><rect x="13.5" y="17" width="2" height="2"/><rect x="10" y="20.5" width="1.6" height="1.6"/></svg><span class="anim-barre" aria-hidden="true"></span></button>
-    <button class="btn primary small" id="btnCam" type="button">+ Page</button>
-  </header>
-
-  <div class="pages" id="pages" hidden></div>
-
   <div class="viewport" id="viewport">
     <canvas id="cv" width="10" height="10"></canvas>
+    <canvas id="fx" class="fx" width="10" height="10" aria-hidden="true"></canvas>
     <div class="tampon" id="tampon" hidden aria-hidden="true"></div>
 
     <p class="toast" id="toast" role="status" hidden></p>
     <div class="pile-haut">
-  <p class="tampon-note" id="tamponNote" hidden>Ce filigrane disparaît quand vous validez le document, au moment de l'envoyer. Tant qu'il n'est pas validé, la mention reste.</p>
-    <div class="trouves" id="trouves" hidden role="status">
-      <button class="btn small" id="trouvesPrec" type="button" aria-label="Élément précédent">‹</button>
-      <span id="trouvesTexte"></span>
-      <button class="btn small" id="trouvesSuiv" type="button" aria-label="Élément suivant">›</button>
-      <button class="btn small" id="trouvesFermer" type="button" aria-label="Fermer">✕</button>
+      <p class="tampon-note" id="tamponNote" hidden>Ce filigrane disparaît quand vous validez le document, au moment de l'envoyer.</p>
+      <div class="mode-chip" id="modeChip" hidden><span id="modeTexte"></span><button class="btn small" id="modeFin" type="button">Terminé</button></div>
+      <div class="pages" id="pages" hidden></div>
+      <div class="trouves" id="trouves" hidden role="status">
+        <button class="btn small" id="trouvesPrec" type="button" aria-label="Élément précédent">‹</button>
+        <span id="trouvesTexte"></span>
+        <button class="btn small" id="trouvesSuiv" type="button" aria-label="Élément suivant">›</button>
+        <button class="btn small" id="trouvesFermer" type="button" aria-label="Fermer">✕</button>
+      </div>
+      <div class="pile-boutons">
+        <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+        <button class="btn small chercher-ici" id="chercherIci" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg> Rechercher ici</button>
+      </div>
     </div>
-    <div class="pile-boutons">
-  <button class="fit" id="fit" type="button" hidden>Ajuster</button>
-    <button class="btn small chercher-ici" id="chercherIci" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg> Rechercher ici</button>
-    </div>
-    </div>
-
 
     <button class="zones-chip" id="zonesChip" type="button" hidden></button>
     <button class="btn primary crop-screen" id="cropScreen" type="button" hidden>Garder ce qui est à l'écran</button>
@@ -97,34 +93,45 @@
     <div class="selbar" id="selbar" hidden>
       <button class="btn small dark" id="selMask" type="button">Masquer</button>
       <button class="btn small primary" id="selAll" type="button">Tous les pareils</button>
+      <button class="btn small" id="selRef" type="button">Référencer</button>
+      <button class="btn small" id="selColonne" type="button" hidden>Toute la colonne, sauf l'en-tête</button>
       <button class="btn small" id="selZone" type="button">Même endroit, chaque page</button>
       <button class="btn small" id="selCancel" type="button" aria-label="Annuler la sélection">✕</button>
+    </div>
+    <div class="selbar" id="refbar" hidden>
+      <span class="refbar-titre">C'est :</span>
+      <button class="btn small" type="button" data-ref="PERSONNE">un nom</button>
+      <button class="btn small" type="button" data-ref="ADRESSE">une adresse</button>
+      <button class="btn small" type="button" data-ref="REF">une référence</button>
+      <button class="btn small" type="button" data-ref="DONNEE">autre chose</button>
+      <button class="btn small" id="refCancel" type="button" aria-label="Annuler">✕</button>
+    </div>
+    <div class="cherche-panel" id="cherchePanel" hidden>
+      <p><strong>Chercher partout :</strong> décochez ce qui n'est pas une donnée privée.</p>
+      <div class="cherche-liste" id="chercheListe"></div>
+      <div class="cerbere-foot">
+        <button class="btn small" id="chercheAnnuler" type="button">Masquer la zone seule</button>
+        <button class="btn small primary" id="chercheOk" type="button">Chercher</button>
+      </div>
     </div>
     <div class="empty" id="empty">
       <div class="empty-inner">
         <button class="btn primary" id="emptyCam" type="button">Prendre une photo</button>
         <button class="btn ghost" id="emptyFile" type="button">Importer une image ou un PDF</button>
+        <button class="btn ghost" id="emptyColler" type="button" hidden>Coller une capture (Ctrl+V)</button>
       </div>
     </div>
-  </div>
+    <div class="depot" id="depot" hidden><p>Déposez le document ici</p></div>
 
-  <div class="toolbar" id="toolbar" role="radiogroup" aria-label="Outil">
-    <label class="tool"><input type="radio" name="tool" value="brush" id="toolBrush" checked><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c2.5 0 4.5-1 5-3.5l10-10-3-3-10 10C2.5 15 3 18 3 21zM14 5l5 5"/></svg><span>Pinceau</span></label>
-    <label class="tool"><input type="radio" name="tool" value="rect" id="toolRect"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span>Rectangle</span></label>
-    <label class="tool tool-extra"><input type="radio" name="tool" value="move" id="toolMove"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Déplacer</span></label>
-    <label class="tool tool-extra"><input type="radio" name="tool" value="crop" id="toolCrop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span></label>
-    <label class="tool tool-extra"><input type="radio" name="tool" value="erase" id="toolErase"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span></label>
-    <button class="tool" id="undo" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg><span>Retour</span></button>
-    <button class="tool" id="toolPlus" type="button" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span id="toolPlusTexte">Plus</span></button>
+    <!-- Les quatre coins -->
+    <button class="coin coin-hg" id="undo" type="button" aria-label="Annuler le dernier geste" title="Annuler le dernier geste (Ctrl+Z)"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-4"/></svg></button>
+    <button class="coin coin-hd" id="coinMove" type="button" aria-pressed="false" aria-label="Déplacer la feuille" title="Déplacer la feuille (M, ou barre d'espace)"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
+    <button class="coin coin-bg" id="btnOpts" type="button" aria-label="Menu : envoyer et autres outils" title="Menu"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="coin coin-bd" id="coinDoigt" type="button" aria-pressed="true" aria-label="Effacer au doigt" title="Effacer au doigt (D)"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V4.5a1.5 1.5 0 013 0V10"/><path d="M12 9.5V8a1.5 1.5 0 013 0v2.5"/><path d="M15 10a1.5 1.5 0 013 0v4.5c0 3.6-2.5 6.5-6 6.5h-.6c-2 0-3.4-.8-4.6-2.3L4.3 15a1.5 1.5 0 012.3-1.9L9 15"/></svg></button>
   </div>
-
-  <nav class="dock" aria-label="Actions principales">
-    <button class="btn" id="btnOpts" type="button">Réglages</button>
-    <button class="btn" id="btnCopy" type="button">Copier</button>
-    <button class="btn primary" id="btnShare" type="button">Partager</button>
-  </nav>
 
   <input type="file" id="inCam" accept="image/*" capture="environment" hidden>
+  <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
 
   <!-- Caméra intégrée : la photo ne passe jamais par la galerie -->
   <div class="camview" id="camView" hidden>
@@ -134,23 +141,45 @@
       <p class="cam-tip">Touchez le document pour faire la mise au point. Tenez le téléphone à 20–30 cm, bien parallèle à la feuille.</p>
     </div>
     <div class="cambar">
-      <button class="btn small" id="camCancel" type="button">Annuler</button>
+      <div class="cam-gauche">
+        <button class="btn small" id="camCancel" type="button">Annuler</button>
+        <button class="btn small" id="camImport" type="button">Importer</button>
+      </div>
       <button class="shutter" id="camShot" type="button" aria-label="Prendre la photo"></button>
       <button class="btn small" id="camTorch" type="button" aria-pressed="false" hidden>Lampe</button>
     </div>
     <p class="cam-note">Cette photo ne va pas dans la galerie. <button class="link" id="camSysteme" type="button">Utiliser l'appareil photo du téléphone</button></p>
   </div>
-  <input type="file" id="inFile" accept="application/pdf,image/*" multiple hidden>
 
-  <!-- Réglages : tout le reste, rangé ici -->
+  <!-- Le menu : envoyer d'abord, puis les outils, puis les réglages -->
   <div class="backdrop" id="backdrop" hidden></div>
-  <section class="sheet" id="sheet" hidden aria-label="Réglages">
+  <section class="sheet" id="sheet" hidden aria-label="Menu">
     <div class="sheet-head">
-      <h3>Réglages</h3>
+      <h3>Menu</h3>
+      <span class="pageinfo" id="pageInfo"></span>
       <button class="btn small" id="closeSheet" type="button">Fermer</button>
     </div>
 
-    <details class="group" id="termsPanel" open>
+    <div class="menu-envoi">
+      <button class="btn primary big avec-avion" id="btnShare" type="button"><svg class="avion" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg> Envoyer</button>
+      <div class="menu-ligne">
+        <button class="btn" id="btnCopy" type="button">Copier l'image</button>
+        <button class="btn" id="btnSave" type="button">Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="menu-outils" role="group" aria-label="Outils">
+      <button class="outil" id="mRect" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="1.5" fill="currentColor"/></svg><span>Rectangle</span><small>sélectionner, retrouver partout</small></button>
+      <button class="outil" id="mChercher" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg><span>Rechercher ici</span><small>relire de près la zone affichée</small></button>
+      <button class="outil" id="mGomme" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span><small>faire réapparaître une donnée</small></button>
+      <button class="outil" id="mRecadrer" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span><small>ne garder que la feuille</small></button>
+      <button class="outil" id="btnCam" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Ajouter une photo</span><small>nouvelle page</small></button>
+      <button class="outil" id="btnFile" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6v18h12V7zM14 3v4h4M12 11v6M9 14l3 3 3-3"/></svg><span>Importer</span><small>image ou PDF</small></button>
+      <button class="outil" id="mColler" type="button" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9zM7 5H5v16h14V5h-2"/></svg><span>Coller une capture</span><small>Ctrl+V</small></button>
+      <button class="outil" id="mCapture" type="button" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg><span>Capturer l'écran</span><small>une fenêtre ou un onglet</small></button>
+    </div>
+
+    <details class="group" id="termsPanel">
       <summary>Ce qu'il faut masquer</summary>
       <label for="tNames">Noms et prénoms</label>
       <input type="text" id="tNames" autocomplete="off" placeholder="Ex. Jean Exemple, Marie Exemple">
@@ -177,30 +206,39 @@
     </details>
 
     <details class="group">
-      <summary>Export</summary>
-      <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
-      <button class="btn" id="btnSave" type="button">Enregistrer sur l'appareil</button>
-      <button class="btn" id="btnFile" type="button">Importer une image ou un PDF</button>
-      <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées.</p>
-    </details>
-
-    <details class="group">
-      <summary>Avancé</summary>
-      <label class="check"><input type="checkbox" id="optStrict"> Mode strict (professionnels)</label>
-      <p class="hint">En mode strict, chaque point du contrôle « Remove Before Flight » doit être traité, puis un aperçu final s'affiche avant tout envoi.</p>
-      <label class="check" id="mentionBloc" hidden><input type="checkbox" id="optMention" checked> Ajouter la mention « Masqué avec Kerckhoffs » en bas du document</label>
-      <p class="hint">Sans le mode strict, chaque document envoyé porte en bas la mention « Masqué avec Kerckhoffs · non contrôlé en mode strict ». Seul un document contrôlé en mode strict peut partir sans mention.</p>
-      <button class="btn avec-avion" id="btnCerbere" type="button"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg> Lancer le contrôle « Remove Before Flight »</button>
-      <p class="hint">Avant chaque envoi, Kerckhoffs relit ce qui reste visible et signale ce qui pourrait encore vous identifier.</p>
-      <label class="check"><input type="checkbox" id="optAnim" checked> Animation avant l'envoi</label>
-      <p class="hint">Les zones masquées tombent comme du sable avant que le document parte. Aussi réglable avec le bouton en haut de l'écran de travail.</p>
-      <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
-      <p class="hint">Décochée, l'image part sans aucun masquage : à n'utiliser que pour un document sans données personnelles.</p>
-      <label class="brush" for="brush">Épaisseur du pinceau
+      <summary>Réglages</summary>
+      <fieldset class="choix-niveau">
+        <legend>Remove Before Flight</legend>
+        <label class="check"><input type="radio" name="niveau" value="strict" id="niveauStrict" checked> Strict : la liste à chaque envoi, tout est vérifié</label>
+        <label class="check"><input type="radio" name="niveau" value="normal" id="niveauNormal"> Normal : la liste seulement s'il reste quelque chose</label>
+        <p class="hint" id="niveauNote">En Strict, chaque point doit être traité, Kerckhoffs fait une dernière relecture, puis un aperçu s'affiche avant l'envoi.</p>
+        <input type="checkbox" id="optStrict" hidden checked>
+      </fieldset>
+      <label class="check" id="mentionBloc"><input type="checkbox" id="optMention" checked> Mention « Masqué avec Kerckhoffs » en bas du document</label>
+      <p class="hint">En Normal, la mention reste toujours. En Strict, vous pouvez la retirer.</p>
+      <fieldset class="choix-niveau">
+        <legend>Ce qui recouvre les données</legend>
+        <label class="check"><input type="radio" name="style" value="noir" id="styleNoir" checked> Noir</label>
+        <label class="check"><input type="radio" name="style" value="flou" id="styleFlou"> Flou opaque : une tache de la couleur moyenne, sans rien dessous</label>
+      </fieldset>
+      <label class="check"><input type="checkbox" id="optGaucher"> Je suis gaucher : boutons en miroir</label>
+      <label class="check" id="camDirecteBloc"><input type="checkbox" id="optCamDirecte" checked> Ouvrir directement l'appareil photo</label>
+      <label class="check"><input type="checkbox" id="optAnim" checked> Animations</label>
+      <p class="hint">Les lettres tombent en sable quand on efface, et quand le document part.</p>
+      <label class="brush" for="brush">Taille du doigt
         <input type="range" id="brush" min="1" max="14" value="4">
       </label>
+      <button class="btn avec-avion" id="btnCerbere" type="button"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg> Lancer le contrôle « Remove Before Flight »</button>
+      <label class="check"><input type="checkbox" id="optMask" checked> Masquer mes données</label>
+      <p class="hint">Décochée, l'image part sans aucun masquage : à n'utiliser que pour un document sans données personnelles.</p>
+      <div class="formats-bloc">
+        <p class="hint"><strong>Format d'envoi</strong></p>
+        <div class="formats" id="formats" role="radiogroup" aria-label="Format"></div>
+        <p class="hint">Les métadonnées cachées des photos (lieu, date, appareil) sont toujours supprimées.</p>
+      </div>
     </details>
 
+    <button class="btn" id="back" type="button">Fermer le document et revenir à l'accueil</button>
     <p class="status" id="status" role="status"></p>
     <p class="legend" id="legend" hidden></p>
   </section>
@@ -208,11 +246,12 @@
   <!-- Cerbère : le rapport avant envoi -->
   <section class="sheet cerbere" id="cerbere" hidden aria-label="Remove Before Flight : contrôle avant envoi">
     <h3 class="ruban ruban-haut"><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg><span>À retirer avant l'envoi</span><svg class="avion" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor"><path d="M21 15.5v-1.8l-7.5-4.7V4.2c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5V9L3 13.7v1.8l7.5-2.3v4.7L8.6 19.3v1.4l3.4-1 3.4 1v-1.4l-1.9-1.4v-4.7z"/></svg></h3>
-    <p class="rbf-alerte" id="cerbereAlerte" hidden><strong>Attention :</strong> un code postal, un âge, le sexe et une maladie rare suffisent souvent à retrouver une personne, même sans son nom. Si plusieurs de ces informations restent visibles, masquez-en au moins une avant d'envoyer.</p>
+    <p class="rbf-alerte" id="cerbereAlerte" hidden><strong>Attention :</strong> un code postal, un âge, le sexe, une situation (chômage, licenciement) ou une maladie rare suffisent souvent à retrouver une personne, même sans son nom. Si plusieurs de ces informations restent visibles, masquez-en au moins une avant d'envoyer.</p>
     <p id="cerbereIntro"></p>
     <ul class="cerbere-list" id="cerbereList"></ul>
     <p class="hint">Touchez un point pour le voir sur l'image. Rien n'est masqué sans vous : vous décidez.</p>
-    <p class="hint strict-note" id="cerbereStrictNote" hidden>Mode strict : traitez chaque point (Masquer ou Laisser) pour continuer.</p>
+    <p class="hint strict-note" id="cerbereStrictNote" hidden>Niveau Strict : traitez chaque point (Masquer ou Laisser) pour continuer.</p>
+    <p class="rbf-mention" id="cerbereMention"></p>
     <button class="btn" id="cerbereBalayage" type="button">Dernier balayage : chercher partout ce qui est déjà masqué</button>
     <div class="cerbere-foot">
       <button class="btn" id="cerbereBack" type="button">Revenir</button>
@@ -229,6 +268,7 @@
       <p class="envol-texte">Ce qui était masqué n'existe plus. Voici exactement ce qui part.</p>
       <div class="cerbere-foot">
         <button class="btn" id="envolRevenir" type="button">Revenir</button>
+        <button class="btn" id="envolCopier" type="button" hidden>Copier l'image</button>
         <button class="btn primary" id="envolEnvoyer" type="button">Envoyer</button>
       </div>
     </div>

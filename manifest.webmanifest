@@ -34,5 +34,13 @@
       "purpose": "any"
     }
   ],
-  "id": "./"
+  "id": "./",
+  "share_target": {
+    "action": "./partage",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [{ "name": "fichiers", "accept": ["image/*", "application/pdf", ".pdf"] }]
+    }
+  }
 }

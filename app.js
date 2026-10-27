@@ -59,6 +59,9 @@
   const ctx = cv.getContext("2d");
   const page = () => S.pages[S.cur];
   const changed = () => { S.version++; };
+  // Ce qui recouvre les données : « noir » ou « flou » (flou opaque). Voir couleurDe().
+  let styleMasque = "noir";
+  try { styleMasque = localStorage.getItem("kerckhoffs-style") === "flou" ? "flou" : "noir"; } catch (e) {}
   let cerbereOk = -1;        // version du document déjà validée par la vérification avant envoi
 
   // Le message s'affiche sous l'image et, bien visible, par-dessus l'image.
@@ -85,6 +88,7 @@
     $("inFile").accept = "application/pdf,image/*";
     closeSheet();
     buildFormats();
+    setTool(outilBase, true);
     updateUI();
     window.scrollTo(0, 0);
   }
@@ -92,7 +96,7 @@
   function wipe() {
     S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
     S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true; $("zonesChip").hidden = true;
-    S.balayage = []; S.trouves = null; S.orange = null; if ($("trouves")) $("trouves").hidden = true;
+    S.balayage = []; S.appris = []; S.trouves = null; S.orange = null; if ($("trouves")) $("trouves").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
     profilSnapshot = "";
     history.length = 0;
@@ -111,11 +115,12 @@
     if (profilModifie()) { $("finSession").hidden = false; return; } // garder les mots appris ?
     if (S.pages.length && !S.leaving) {
       S.leaving = true;
-      setStatus("Touchez encore « Accueil » pour tout effacer et revenir.");
-      setTimeout(() => { S.leaving = false; }, 4000);
+      $("back").textContent = "Touchez encore : tout effacer et revenir à l'accueil";
+      setTimeout(() => { S.leaving = false; $("back").textContent = "Fermer le document et revenir à l'accueil"; }, 4000);
       return;
     }
-    wipe(); fermerCamera();
+    $("back").textContent = "Fermer le document et revenir à l'accueil";
+    wipe(); fermerCamera(); closeSheet();
     $("work").hidden = true;
     $("home").hidden = false;
   });
@@ -144,10 +149,9 @@
     $("empty").hidden = has;
     majFiligrane();
     cv.hidden = !has;
-    ["detect", "btnShare", "btnCopy", "btnSave"].forEach((id) => { $(id).disabled = !has; });
+    ["detect", "btnShare", "btnCopy", "btnSave", "mRect", "mChercher", "mGomme", "mRecadrer", "coinMove", "coinDoigt"].forEach((id) => { $(id).disabled = !has; });
     updateUndo();
     $("pageInfo").textContent = S.pages.length > 1 ? `page ${S.cur + 1} / ${S.pages.length}` : "";
-    $("btnCam").hidden = !has;
     const pg = $("pages");
     pg.hidden = S.pages.length < 2;
     pg.textContent = "";
@@ -159,6 +163,7 @@
       pg.append(b);
     });
     $("btnCopy").textContent = fmt() === "text" ? "Copier le texte" : "Copier l'image";
+    $("modeChip").hidden = !MODES[tool] || !has;
     renderLegend();
   }
 
@@ -270,7 +275,11 @@
 
   async function ouvrirCamera() {
     closeSheet();
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $("inCam").click(); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      // Ce navigateur n'a pas d'accès direct à la caméra : c'est l'appareil photo du téléphone qui prend le relais.
+      setStatus("Ici, c'est l'appareil photo du téléphone qui s'ouvre : cette photo pourrait être enregistrée dans votre galerie. Pensez à la supprimer ensuite.", true);
+      $("inCam").click(); return;
+    }
     try {
       flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, ...VIDEO }, audio: false });
       // Une fois l'accès accordé, les noms des caméras sont connus : on bascule sur l'objectif principal si besoin.
@@ -347,15 +356,40 @@
     setStatus("Appareil photo du téléphone : il peut ranger la photo dans la galerie. Pensez à la supprimer ensuite.");
     $("inCam").click();
   });
-  $("camCancel").addEventListener("click", fermerCamera);
+  $("camCancel").addEventListener("click", () => { fermerCamera(); if (!S.pages.length) quitter(); });
+  $("camImport").addEventListener("click", () => { fermerCamera(); $("inFile").click(); });
   $("btnCam").addEventListener("click", ouvrirCamera);
   $("emptyCam").addEventListener("click", ouvrirCamera);
   $("btnFile").addEventListener("click", () => $("inFile").click());
   $("emptyFile").addEventListener("click", () => $("inFile").click());
 
-  // Réglages : un panneau qui monte du bas de l'écran
-  function openSheet() { $("sheet").hidden = false; $("backdrop").hidden = false; }
-  function closeSheet() { $("sheet").hidden = true; $("backdrop").hidden = true; }
+  // Réglages gardés sur l'appareil : le style des masques, les boutons en miroir, l'appareil photo à l'ouverture.
+  const lireReglage = (cle, defaut) => { try { const v = localStorage.getItem(cle); return v === null ? defaut : v; } catch (e) { return defaut; } };
+  const ecrireReglage = (cle, v) => { try { localStorage.setItem(cle, v); } catch (e) {} };
+  $(styleMasque === "flou" ? "styleFlou" : "styleNoir").checked = true;
+  document.querySelectorAll('input[name="style"]').forEach((r) => r.addEventListener("change", () => {
+    styleMasque = r.value; ecrireReglage("kerckhoffs-style", r.value); changed(); render();
+  }));
+  const majGaucher = () => $("work").classList.toggle("gaucher", $("optGaucher").checked);
+  $("optGaucher").checked = lireReglage("kerckhoffs-gaucher", "0") === "1"; majGaucher();
+  $("optGaucher").addEventListener("change", () => { ecrireReglage("kerckhoffs-gaucher", $("optGaucher").checked ? "1" : "0"); majGaucher(); });
+  const estTelephone = () => matchMedia("(pointer: coarse)").matches;
+  $("camDirecteBloc").hidden = !estTelephone();
+  $("optCamDirecte").checked = lireReglage("kerckhoffs-camera-directe", "1") === "1";
+  $("optCamDirecte").addEventListener("change", () => ecrireReglage("kerckhoffs-camera-directe", $("optCamDirecte").checked ? "1" : "0"));
+
+  // Le menu : un panneau qui monte du bas de l'écran (sur un grand écran, il se range sur le côté)
+  function openSheet() { $("sheet").hidden = false; $("backdrop").hidden = false; majPanneau(); }
+  function closeSheet() { $("sheet").hidden = true; $("backdrop").hidden = true; majPanneau(); }
+  // Sur un grand écran, le menu et la liste Remove Before Flight se rangent à droite : la feuille se décale pour rester visible.
+  function majPanneau() {
+    const large = matchMedia("(min-width: 900px)").matches;
+    const ouvert = large && (!$("sheet").hidden || !$("cerbere").hidden);
+    if ($("work").classList.contains("panneau") === ouvert) return;
+    const v = S.view, aLaVueEntiere = !v.fit || Math.abs(v.s - v.fit) < 0.001;
+    $("work").classList.toggle("panneau", ouvert);
+    if (page() && aLaVueEntiere) { fitView(); render(); }
+  }
   $("btnOpts").addEventListener("click", openSheet);
   $("closeSheet").addEventListener("click", closeSheet);
   $("backdrop").addEventListener("click", () => { closeSheet(); if (!$("cerbere").hidden) fermerCerbere(); });
@@ -384,10 +418,41 @@
     applyView(); $("fit").hidden = true; $("chercherIci").hidden = true;
   }
 
-  // Un élément dessiné : un trait de pinceau { kind:"line", w, pts } ou un rectangle { kind:"rect", x, y, w, h }.
+  /* Ce qui recouvre les données : du noir, ou un « flou opaque », un aplat de la couleur moyenne de la zone.
+   * Dans les deux cas, il n'y a plus rien dessous : la copie envoyée est une image neuve. */
+  const lumDe = (rgb) => { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(rgb || ""); return m ? 0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3] : 0; };
+  function moyenne(img, r) {
+    const sx = Math.max(0, Math.floor(r.x)), sy = Math.max(0, Math.floor(r.y));
+    const sw = Math.max(1, Math.min(img.width - sx, Math.ceil(r.w))), sh = Math.max(1, Math.min(img.height - sy, Math.ceil(r.h)));
+    const c = document.createElement("canvas"); c.width = 16; c.height = 16;
+    const x = c.getContext("2d", { willReadFrequently: true });
+    x.imageSmoothingQuality = "high";
+    try { x.drawImage(img, sx, sy, sw, sh, 0, 0, 16, 16); } catch (e) { return "rgb(128,128,128)"; }
+    const d = x.getImageData(0, 0, 16, 16).data; let R = 0, G = 0, B = 0;
+    for (let i = 0; i < d.length; i += 4) { R += d[i]; G += d[i + 1]; B += d[i + 2]; }
+    const n = d.length / 4;
+    // un peu plus sombre que la moyenne : la tache se voit, même sur du papier blanc
+    return `rgb(${Math.round(R / n * 0.84)},${Math.round(G / n * 0.84)},${Math.round(B / n * 0.84)})`;
+  }
+  const cadreDe = (st) => {
+    if (st.kind === "rect") return st;
+    const xs = st.pts.map((q) => q[0]), ys = st.pts.map((q) => q[1]), m = st.w / 2;
+    return { x: Math.min(...xs) - m, y: Math.min(...ys) - m, w: Math.max(...xs) - Math.min(...xs) + st.w, h: Math.max(...ys) - Math.min(...ys) + st.w };
+  };
+  // La couleur d'un masque : noir, ou sa couleur moyenne (calculée une fois, sur l'image d'origine).
+  function couleurDe(o, p) {
+    if (styleMasque !== "flou" || !p) return "#000";
+    if (!o.moy || o.moyImg !== p.img) { o.moy = moyenne(p.img, o.kind ? cadreDe(o) : o); o.moyImg = p.img; }
+    return o.moy;
+  }
+  const texteSur = (fond) => (fond === "#000" || lumDe(fond) < 140 ? "#fff" : "#14202b");
+
+  // Un élément dessiné : un trait au doigt { kind:"line", w, pts } ou un rectangle { kind:"rect", x, y, w, h }.
+  // Un trait qui a recouvert des mots lus porte aussi leurs cadres (st.etiq) : le mot entier disparaît, et son étiquette s'y inscrit.
   function strokePath(c, st, couleur) {
     c.save();
     c.fillStyle = couleur || "#000"; c.strokeStyle = couleur || "#000";
+    if (st.etiq) st.etiq.rects.forEach((r) => c.fillRect(r.x, r.y, r.w, r.h));
     if (st.kind === "rect") { c.fillRect(st.x, st.y, st.w, st.h); c.restore(); return; }
     c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = st.w;
     if (st.pts.length === 1) {
@@ -400,20 +465,28 @@
     c.restore();
   }
 
-  function drawBox(c, b, final) {
+  // L'étiquette (« [PERSONNE_1] ») s'inscrit dans un cadre, si elle y tient.
+  function ecrireEtiquette(c, token, r, fond) {
+    const fs = Math.min(r.h * 0.6, r.w / (token.length * 0.62));
+    if (fs < 7) return;
+    c.save();
+    c.fillStyle = texteSur(fond); c.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(token, r.x + r.w / 2, r.y + r.h / 2, r.w - 4);
+    c.restore();
+  }
+  // Une zone détectée sous un rectangle tracé à la main : pas d'étiquette (le rectangle masque, sans rien dire de ce qu'il cache).
+  const sousRectangle = (p, b) => p && p.strokes.some((st) => st.kind === "rect" && !st.ref &&
+    b.x + b.w / 2 >= st.x && b.x + b.w / 2 <= st.x + st.w && b.y + b.h / 2 >= st.y && b.y + b.h / 2 <= st.y + st.h);
+  function drawBox(c, b, final, p) {
     const rects = b.rects || [b];
     c.save();
     if (b.active) {
-      c.fillStyle = "#000";
+      const fond = couleurDe(b, p);
+      c.fillStyle = fond;
       rects.forEach((r) => c.fillRect(r.x, r.y, r.w, r.h));
-      // L'étiquette va dans le plus large rectangle, si elle y tient.
       const r = rects.reduce((m, x) => (x.w > m.w ? x : m), rects[0]);
-      const fs = Math.min(r.h * 0.6, r.w / (b.token.length * 0.62));
-      if (fs >= 7) {
-        c.fillStyle = "#fff"; c.font = `600 ${fs}px ui-monospace, Menlo, Consolas, monospace`;
-        c.textAlign = "center"; c.textBaseline = "middle";
-        c.fillText(b.token, r.x + r.w / 2, r.y + r.h / 2, r.w - 4);
-      }
+      if (!sousRectangle(p, b)) ecrireEtiquette(c, b.token, r, fond);
     } else if (!final) {
       c.setLineDash([10, 6]); c.lineWidth = Math.max(2, cv.width / 600); c.strokeStyle = "#002366";
       rects.forEach((r) => c.strokeRect(r.x, r.y, r.w, r.h));
@@ -428,9 +501,21 @@
   function paint(c, p, masked, final) {
     c.drawImage(p.img, 0, 0);
     if (!masked) return;
-    p.strokes.forEach((st) => strokePath(c, st));
-    p.boxes.forEach((b) => drawBox(c, b, final));
+    p.strokes.forEach((st) => strokePath(c, st, couleurDe(st, p)));
+    p.boxes.forEach((b) => drawBox(c, b, final, p));
+    // Les étiquettes des mots effacés au doigt, et des rectangles référencés
+    p.strokes.forEach((st) => {
+      const e = st.etiq || st.ref;
+      if (!e) return;
+      const token = tokenFor(e.key, e.type, e.value);
+      if (st.etiq) ecrireEtiquette(c, token, st.etiq.zone || unionDe(st.etiq.rects), couleurDe(st, p));
+      else ecrireEtiquette(c, token, st, couleurDe(st, p));
+    });
   }
+  const unionDe = (rects) => {
+    const x0 = Math.min(...rects.map((r) => r.x)), y0 = Math.min(...rects.map((r) => r.y));
+    return { x: x0, y: y0, w: Math.max(...rects.map((r) => r.x + r.w)) - x0, h: Math.max(...rects.map((r) => r.y + r.h)) - y0 };
+  };
   function render() {
     majFiligrane();
     const p = page(); if (!p) return;
@@ -506,7 +591,7 @@
   /* ---------------------- doigt : pinceau, rectangle, gomme, zoom, retour */
   const ptrs = new Map();
   let draft = null, moved = false, downAt = null, pinch = null;
-  let tool = "brush";
+  let tool = "brush", espace = false;
   const history = []; // actions à annuler : { type:"add"|"remove"|"toggle", page, item, index }
 
   function toImg(cx, cy) {
@@ -515,20 +600,40 @@
   }
   const brushW = () => (+$("brush").value / 100) * Math.max(320, Math.min(cv.width, cv.height));
 
-  document.querySelectorAll('input[name="tool"]').forEach((r) => r.addEventListener("change", () => {
-    tool = r.value;
-    if (S.sel) unselect();
-    if (S.cadre) annulerCadre();
-    $("cropScreen").hidden = tool !== "crop" || !page();
-    const hints = {
-      move: "Un doigt : faire glisser l'image. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
-      brush: "Un doigt : effacer au pinceau. Deux doigts : zoomer et déplacer.",
-      crop: "Zoomez et déplacez avec deux doigts pour ne voir que la feuille, puis touchez « Garder ce qui est à l'écran ». Ou glissez en diagonale autour de la feuille.",
-      rect: "Glissez en diagonale pour sélectionner une zone. Mal visé ? Faites glisser la sélection, ou tirez ses coins. Puis choisissez : la masquer, masquer tous les pareils, ou la répéter au même endroit sur chaque page.",
-      erase: "Touchez un trait ou un rectangle pour l'enlever. Touchez une zone détectée pour la démasquer.",
-    };
-    if (page()) setStatus(hints[tool]);
-  }));
+  // Deux modes de base, aux coins : déplacer la feuille (la croix) ou effacer au doigt.
+  // Rectangle, Gomme et Recadrer s'ouvrent depuis le menu, le temps d'un geste, puis on revient au mode de base.
+  let outilBase = "brush";
+  const AIDES = {
+    move: "Un doigt : faire glisser la feuille. Deux doigts : zoomer. « Ajuster » revient à la vue entière.",
+    brush: "Passez le doigt sur ce qui doit disparaître. Deux doigts : zoomer et déplacer.",
+    crop: "Zoomez et déplacez avec deux doigts pour ne voir que la feuille, puis touchez « Garder ce qui est à l'écran ». Ou glissez en diagonale autour de la feuille.",
+    rect: "Glissez en diagonale sur une zone. Puis : la masquer, retrouver tous les pareils, ou dire ce que c'est (Référencer).",
+    erase: "Touchez une zone masquée pour la faire réapparaître.",
+  };
+  const MODES = { rect: "Rectangle", crop: "Recadrer", erase: "Gomme : touchez ce qui doit réapparaître" };
+  function setTool(v, silencieux) {
+    tool = v;
+    if (v === "brush" || v === "move") outilBase = v;
+    if (S.sel && v !== "rect") unselect();
+    if (S.cadre && v !== "crop") annulerCadre();
+    $("refbar").hidden = true;
+    $("coinDoigt").setAttribute("aria-pressed", String(v === "brush"));
+    $("coinMove").setAttribute("aria-pressed", String(v === "move"));
+    $("modeChip").hidden = !MODES[v] || !page();
+    $("modeTexte").textContent = MODES[v] || "";
+    $("cropScreen").hidden = v !== "crop" || !page();
+    if (page() && !silencieux) setStatus(AIDES[v]);
+  }
+  const finGeste = () => setTool(outilBase, true);
+  $("coinDoigt").addEventListener("click", () => setTool("brush"));
+  $("coinMove").addEventListener("click", () => setTool("move"));
+  $("modeFin").addEventListener("click", () => setTool(outilBase));
+  $("modeChip").addEventListener("pointerdown", (e) => e.stopPropagation());
+  $("mRect").addEventListener("click", () => { closeSheet(); setTool("rect"); });
+  $("mGomme").addEventListener("click", () => { closeSheet(); setTool("erase"); });
+  $("mRecadrer").addEventListener("click", () => { closeSheet(); setTool("crop"); });
+  $("mChercher").addEventListener("click", () => { closeSheet(); chercherIci(); });
+  ["undo", "coinMove", "coinDoigt", "btnOpts", "pages", "empty"].forEach((id) => $(id).addEventListener("pointerdown", (e) => e.stopPropagation()));
 
   function distSeg(px, py, a, b) {
     const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy;
@@ -563,6 +668,80 @@
     return false;
   }
   function afterEdit() { changed(); render(); renderLegend(); updateUndo(); }
+
+  /* Le doigt : les mots qu'il recouvre disparaissent en entier, et prennent leur étiquette (NOM_1, REF_1…).
+   * Le type vient de ce que Kerckhoffs sait déjà de ces mots ; sinon, c'est une donnée (DONNEE_1). */
+  function etiqueterTrait(p, st) {
+    if (st.kind !== "line" || !p.lines) return;
+    const couvre = (x, y) => {
+      if (st.pts.length === 1) return Math.hypot(x - st.pts[0][0], y - st.pts[0][1]) <= st.w / 2;
+      for (let k = 1; k < st.pts.length; k++) if (distSeg(x, y, st.pts[k - 1], st.pts[k]) <= st.w / 2) return true;
+      return false;
+    };
+    const groupes = [];
+    p.lines.forEach((l) => {
+      const mots = l.words.filter((w) => {
+        const b = w.bbox; let n = 0;
+        for (const fx of [0.15, 0.5, 0.85]) for (const fy of [0.3, 0.7]) if (couvre(b.x0 + (b.x1 - b.x0) * fx, b.y0 + (b.y1 - b.y0) * fy)) n++;
+        return n >= 3;
+      });
+      if (mots.length) groupes.push(mots);
+    });
+    if (!groupes.length) return;
+    const principal = groupes.reduce((m, g) => (g.length > m.length ? g : m), groupes[0]);
+    const texte = principal.map((w) => w.text).join(" ").replace(/^[\s,;:.]+|[\s,;:.]+$/g, "");
+    if (!texte) return;
+    let type = "DONNEE", key = "DONNEE|" + norm(texte), value = texte;
+    const box = p.boxes.find((b) => (b.words || []).some((w) => principal.includes(w)));
+    const connu = box && [...S.tokens.values()].find((x) => x.token === box.token);
+    if (box && connu) { type = connu.type; key = box.key; value = connu.value; }
+    else {
+      const u = userTerms().find((x) => !x.needle && K.motsACherche(x.value).some((c) => principal.some((w) => K.ressemble(w.text, c))));
+      if (u) { type = u.type; key = u.key; value = u.value; }
+      else if (K.formeIdentifiant(texte)) type = "REF", key = "REF|" + norm(texte);
+    }
+    const tous = groupes.flat();
+    st.etiq = { rects: rectsDe(tous), zone: unionDe(rectsDe(principal)), key, type, value };
+  }
+
+  // Les peluches : quand on efface, l'encre des lettres tombe en petits grains, comme sous une gomme.
+  function peluches(p, st) {
+    if (!animOn || reduireMouvements()) return;
+    const fx = $("fx"), r = vp.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    fx.width = Math.round(r.width * dpr); fx.height = Math.round(r.height * dpr);
+    const x = fx.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const z0 = cadreDe(st), zone = st.etiq ? unionDe(st.etiq.rects.concat([z0])) : z0;
+    const k = Math.min(1, 140 / Math.max(zone.w, zone.h, 1));
+    const W = Math.max(1, Math.round(zone.w * k)), H = Math.max(1, Math.round(zone.h * k));
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const cx = c.getContext("2d", { willReadFrequently: true });
+    try { cx.drawImage(p.img, zone.x, zone.y, zone.w, zone.h, 0, 0, W, H); } catch (e) { return; }
+    const d = cx.getImageData(0, 0, W, H).data, grains = [];
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      const o = (j * W + i) * 4;
+      if (d[o] * 0.299 + d[o + 1] * 0.587 + d[o + 2] * 0.114 < 150 && Math.random() < 0.7)
+        grains.push({ x: zone.x + (i + 0.5) / k, y: zone.y + (j + 0.5) / k, c: `rgb(${d[o]},${d[o + 1]},${d[o + 2]})`, vx: (Math.random() - 0.5) * 70, vy: -Math.random() * 70, t0: Math.random() * 0.12 });
+    }
+    st.pts.forEach((q, i) => { if (i % 2 === 0) grains.push({ x: q[0], y: q[1], c: "rgba(120,110,120,.95)", vx: (Math.random() - 0.5) * 120, vy: -40 - Math.random() * 60, t0: Math.random() * 0.1, miette: true }); });
+    if (!grains.length) return;
+    const s = S.view.s, tx = S.view.tx, ty = S.view.ty, taille = Math.max(1.5, (s / k) * 0.9), duree = 0.8;
+    let t0 = null;
+    const pas = (ts) => {
+      if (t0 === null) t0 = ts;
+      const t = (ts - t0) / 1000;
+      x.clearRect(0, 0, r.width, r.height);
+      if (t >= duree) return;
+      x.globalAlpha = Math.max(0, 1 - Math.max(0, t - 0.35) / (duree - 0.35));
+      for (const g of grains) {
+        const dt = Math.max(0, t - g.t0);
+        x.fillStyle = g.c;
+        const tl = g.miette ? Math.max(3, taille * 2.2) : taille;
+        x.fillRect(tx + g.x * s + g.vx * dt, ty + g.y * s + g.vy * dt + 0.5 * 1100 * dt * dt, tl, tl);
+      }
+      requestAnimationFrame(pas);
+    };
+    requestAnimationFrame(pas);
+  }
   function updateUndo() { $("undo").disabled = !history.some((h) => S.pages.includes(h.page)); }
 
   const vp = $("viewport");
@@ -573,7 +752,12 @@
     if (ptrs.size === 1) {
       downAt = [e.clientX, e.clientY]; moved = false;
       const pt = toImg(e.clientX, e.clientY);
-      if (tool === "move") draft = { kind: "pan", pt, tx0: S.view.tx, ty0: S.view.ty };
+      const deplacer = tool === "move" || espace || (e.pointerType === "mouse" && (e.button === 1 || e.button === 2));
+      if (tool === "rect" && S.sel && S.sel.page === page() && !prise(S.sel.rect, pt[0], pt[1]) && !deplacer) {
+        // Un nouveau rectangle commence alors que le précédent attendait un choix : le précédent est masqué, pas perdu.
+        maskRect(S.sel.page, S.sel.rect); S.sel = null; $("selbar").hidden = true; $("selColonne").hidden = true; afterEdit();
+      }
+      if (deplacer) draft = { kind: "pan", pt, tx0: S.view.tx, ty0: S.view.ty, force: tool !== "move" };
       else if (tool === "brush") draft = { kind: "line", w: brushW(), pts: [pt] };
       else if (tool === "rect" || tool === "crop") {
         const cible = tool === "rect" ? (S.sel && S.sel.page === page() ? S.sel : null) : (S.cadre && S.cadre.page === page() ? S.cadre : null);
@@ -643,7 +827,7 @@
     if (d.kind === "erase") return;
     if (d.kind === "ajuster") { render(); return; } // la sélection reste, à sa nouvelle place
     if (d.kind === "pan") {
-      if (!moved) { const hit = hitBox(p, d.pt[0], d.pt[1]); if (hit) { toggleBox(p, hit); afterEdit(); } }
+      if (!moved && !d.force) { const hit = hitBox(p, d.pt[0], d.pt[1]); if (hit) { toggleBox(p, hit); afterEdit(); } }
       return;
     }
     if (!moved || (d.kind === "rect" && (d.w < 4 || d.h < 4))) {
@@ -659,12 +843,15 @@
       $("cropbar").hidden = false; $("cropScreen").hidden = true; render();
       return;
     }
-    if (d.kind === "rect") { select(p, { x: d.x, y: d.y, w: d.w, h: d.h }); return; }
+    if (d.kind === "rect") { select(p, aimanter(p, { x: d.x, y: d.y, w: d.w, h: d.h })); return; }
     const item = d;
+    etiqueterTrait(p, item);
     p.strokes.push(item);
     history.push({ type: "add", page: p, item });
     afterEdit();
+    peluches(p, item);
   }
+  vp.addEventListener("contextmenu", (e) => e.preventDefault()); // le bouton droit déplace la feuille
   vp.addEventListener("pointerup", endPointer);
   vp.addEventListener("pointercancel", endPointer);
   vp.addEventListener("wheel", (e) => {
@@ -689,6 +876,7 @@
       if (h.type === "add") { const i = h.page.strokes.indexOf(h.item); if (i >= 0) h.page.strokes.splice(i, 1); }
       else if (h.type === "remove") h.page.strokes.splice(Math.min(h.index, h.page.strokes.length), 0, h.item);
       else if (h.type === "toggle") h.item.active = !h.item.active;
+      else if (h.type === "resize") Object.assign(h.item, h.avant, { moy: null });
       else if (h.type === "crop") { Object.assign(h.page, h.avant); fitView(); detectPages([h.page]); }
       const pi = S.pages.indexOf(h.page);
       if (pi !== S.cur) { S.cur = pi; fitView(); updateUI(); }
@@ -720,7 +908,7 @@
     S.cadre = { page: page(), rect: zoneVisible() };
     $("cropOk").click();
   });
-  $("cropCancel").addEventListener("click", annulerCadre);
+  $("cropCancel").addEventListener("click", () => { annulerCadre(); finGeste(); });
   $("cropbar").addEventListener("pointerdown", (e) => e.stopPropagation());
   $("cropOk").addEventListener("click", () => {
     if (!S.cadre) return;
@@ -737,7 +925,7 @@
     history.push({ type: "crop", page: p, avant });
     S.cadre = null; $("cropbar").hidden = true;
     fitView(); changed(); render();
-    $("cropScreen").hidden = tool !== "crop";
+    finGeste();
     detectPages([p]);
   });
 
@@ -760,10 +948,79 @@
 
   function select(p, rect) {
     S.sel = { page: p, rect };
-    $("selbar").hidden = false;
+    $("selbar").hidden = false; $("refbar").hidden = true;
+    // Un rectangle haut et étroit, collé aux traits d'une colonne : on propose de masquer toute la colonne, sauf son en-tête.
+    $("selColonne").hidden = !(rect.aimante && rect.h > p.img.height * 0.12 && colonneEntiere(p, rect));
     render();
   }
-  function unselect() { S.sel = null; $("selbar").hidden = true; render(); }
+  function unselect() { S.sel = null; $("selbar").hidden = true; $("refbar").hidden = true; $("selColonne").hidden = true; render(); }
+
+  /* Le rectangle s'aimante aux traits d'un tableau : s'il commence à quelques pixels d'un trait de colonne ou de ligne,
+   * son bord vient se coller au trait. Ainsi, rien ne dépasse entre le rectangle et le bord de la case. */
+  function pixelsDe(p, x0, y0, x1, y1) {
+    const X0 = Math.max(0, Math.floor(x0)), Y0 = Math.max(0, Math.floor(y0));
+    const X1 = Math.min(p.img.width, Math.ceil(x1)), Y1 = Math.min(p.img.height, Math.ceil(y1));
+    const W = X1 - X0, H = Y1 - Y0;
+    if (W < 2 || H < 2 || !p.img.getContext) return null;
+    const d = p.img.getContext("2d", { willReadFrequently: true }).getImageData(X0, Y0, W, H).data;
+    const lum = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) lum[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) | 0;
+    return { X0, Y0, W, H, lum };
+  }
+  const SOMBRE = 175;
+  function aimanter(p, r) {
+    const tol = Math.max(6, Math.round(Math.min(p.img.width, p.img.height) * 0.012));
+    const px = pixelsDe(p, r.x - tol, r.y - tol, r.x + r.w + tol, r.y + r.h + tol);
+    if (!px) return r;
+    const { X0, Y0, W, H, lum } = px;
+    const yA = Math.max(0, Math.round(r.y - Y0)), yB = Math.min(H, Math.round(r.y + r.h - Y0));
+    const xA = Math.max(0, Math.round(r.x - X0)), xB = Math.min(W, Math.round(r.x + r.w - X0));
+    const colonne = (x) => { let n = 0; for (let y = yA; y < yB; y++) if (lum[y * W + x] < SOMBRE) n++; return n / Math.max(1, yB - yA); };
+    const ligne = (y) => { let n = 0; for (let x = xA; x < xB; x++) if (lum[y * W + x] < SOMBRE) n++; return n / Math.max(1, xB - xA); };
+    const proche = (v0, f, max) => {
+      for (let dv = 0; dv <= tol; dv++) for (const v of [v0 - dv, v0 + dv]) if (v >= 0 && v < max && f(v) > 0.6) return v;
+      return null;
+    };
+    const out = { x: r.x, y: r.y, w: r.w, h: r.h };
+    const g = (r.h > 12) ? proche(Math.round(r.x - X0), colonne, W) : null;
+    const dr = (r.h > 12) ? proche(Math.round(r.x + r.w - X0), colonne, W) : null;
+    const hh = (r.w > 12) ? proche(Math.round(r.y - Y0), ligne, H) : null;
+    const bb = (r.w > 12) ? proche(Math.round(r.y + r.h - Y0), ligne, H) : null;
+    if (g != null) { const nx = X0 + g; out.w += out.x - nx; out.x = nx; }
+    if (dr != null) out.w = X0 + dr + 1 - out.x;
+    if (hh != null) { const ny = Y0 + hh; out.h += out.y - ny; out.y = ny; }
+    if (bb != null) out.h = Y0 + bb + 1 - out.y;
+    out.aimante = g != null && dr != null;
+    return out;
+  }
+  // Toute la colonne, sauf l'en-tête : du premier trait sous l'en-tête jusqu'au dernier trait du tableau.
+  function colonneEntiere(p, r) {
+    const px = pixelsDe(p, r.x, 0, r.x + r.w, p.img.height);
+    if (!px) return null;
+    const { W, H, lum } = px;
+    // Hauteur du trait vertical de gauche, autour du rectangle
+    const xg = 0, sombreG = (y) => lum[y * W + xg] < SOMBRE || (W > 1 && lum[y * W + 1] < SOMBRE);
+    let haut = Math.round(r.y + r.h / 2), bas = haut;
+    let trou = 0;
+    while (haut > 0 && trou < 4) { haut--; trou = sombreG(haut) ? 0 : trou + 1; }
+    trou = 0;
+    while (bas < H - 1 && trou < 4) { bas++; trou = sombreG(bas) ? 0 : trou + 1; }
+    // Les traits horizontaux qui traversent la colonne
+    const traits = [];
+    for (let y = haut; y <= bas; y++) {
+      let n = 0; for (let x = 0; x < W; x++) if (lum[y * W + x] < SOMBRE) n++;
+      if (n / W > 0.7) { if (traits.length && y - traits[traits.length - 1].fin <= 2) traits[traits.length - 1].fin = y; else traits.push({ debut: y, fin: y }); }
+    }
+    if (traits.length < 3) return null;
+    const y0 = traits[1].fin + 1, y1 = traits[traits.length - 1].debut;
+    if (y1 - y0 < 20) return null;
+    return { x: r.x, y: y0, w: r.w, h: y1 - y0 };
+  }
+  $("selColonne").addEventListener("click", () => {
+    if (!S.sel) return;
+    const c = colonneEntiere(S.sel.page, S.sel.rect);
+    if (c) { S.sel.rect = c; $("selColonne").hidden = true; render(); setStatus("Toute la colonne est sélectionnée, sans l'en-tête. Choisissez maintenant : Masquer, ou Tous les pareils."); }
+  });
 
   function maskRect(p, rect) {
     const item = { kind: "rect", x: rect.x, y: rect.y, w: rect.w, h: rect.h };
@@ -791,16 +1048,50 @@
   $("selMask").addEventListener("click", () => {
     if (!S.sel) return;
     maskRect(S.sel.page, S.sel.rect);
-    S.sel = null; $("selbar").hidden = true;
-    afterEdit();
+    S.sel = null; $("selbar").hidden = true; $("selColonne").hidden = true;
+    afterEdit(); finGeste();
   });
-  $("selCancel").addEventListener("click", unselect);
+  $("selCancel").addEventListener("click", () => { unselect(); finGeste(); });
+  // Référencer : dire ce que contient la zone. Elle prend une étiquette, et tous les pareils sont retrouvés avec la même.
+  $("selRef").addEventListener("click", () => { if (S.sel) { $("selbar").hidden = true; $("refbar").hidden = false; } });
+  $("refCancel").addEventListener("click", () => { $("refbar").hidden = true; if (S.sel) $("selbar").hidden = false; });
+  $("refbar").addEventListener("pointerdown", (e) => e.stopPropagation());
+  document.querySelectorAll("#refbar [data-ref]").forEach((b) => b.addEventListener("click", () => referencer(b.dataset.ref)));
+  const motsDans = (p, r) => (p.lines || []).flatMap((l) => l.words).filter((w) => {
+    const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
+    return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
+  });
+  async function referencer(type) {
+    if (!S.sel || busy) return;
+    const { page: p, rect } = S.sel;
+    S.sel = null; $("selbar").hidden = true; $("refbar").hidden = true; $("selColonne").hidden = true; finGeste();
+    const item = { kind: "rect", x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    p.strokes.push(item); history.push({ type: "add", page: p, item }); afterEdit();
+    try { setStatus("Lecture du texte…", true); await ocr(p); } catch (e) {}
+    const elements = p.lines ? elementsDeSelection(p, rect) : [];
+    const brut = motsDans(p, rect).map((w) => w.text).join(" ").trim();
+    const valeur = (elements[0] || brut || "zone").trim();
+    item.ref = { type, value: valeur, key: /\d/.test(valeur) ? type + "|" + valeur.replace(/[\s.]/g, "").toLowerCase() : type + "|" + norm(valeur) };
+    for (const el of elements) {
+      const m = motifDe(el);
+      if (m.kind === "regle") m.regles.filter((r) => !(r.forme && /^[9 ]+$/.test(r.forme) && r.forme.replace(/ /g, "").length < 8))
+        .forEach((r) => { r.type = type; r.id += "|" + type; if (!S.extra.some((x) => x.id === r.id)) S.extra.push(r); });
+      else { const key = type + "|" + norm(el); S.appris = S.appris || []; if (!S.appris.some((x) => x.key === key)) S.appris.push({ type, value: el, key }); }
+    }
+    const avant = instantane();
+    S.tokens = new Map(); S.counters = {};
+    await detectPages(S.pages, () => "");
+    const items = nouveaux(avant, { page: p, rect });
+    const nom = { PERSONNE: "un nom", ADRESSE: "une adresse", REF: "une référence", DONNEE: "une donnée" }[type];
+    setStatus(`Zone référencée comme ${nom}.` + (items.length ? ` ${items.length} autre${items.length > 1 ? "s" : ""} trouvée${items.length > 1 ? "s" : ""}, avec la même étiquette : vérifiez avec ‹ ›.` : " Rien de pareil ailleurs."), true);
+    montrerTrouves(items, true);
+  }
   $("selZone").addEventListener("click", () => {
     if (!S.sel) return;
     const { page: p, rect: r } = S.sel, W = p.img.width, H = p.img.height;
     maskRect(p, r); // ici : masqué tout de suite
     S.zones.push({ x: r.x / W, y: r.y / H, w: r.w / W, h: r.h / H });
-    S.sel = null; $("selbar").hidden = true;
+    S.sel = null; $("selbar").hidden = true; $("selColonne").hidden = true; finGeste();
     afterEdit(); majZones();
     const autres = S.pages.filter((q) => q !== p);
     if (autres.length) { S.tokens = new Map(); S.counters = {}; detectPages(S.pages); }
@@ -887,7 +1178,7 @@
   $("selAll").addEventListener("click", async () => {
     if (!S.sel || busy) return;
     const { page: p, rect } = S.sel;
-    S.sel = null; $("selbar").hidden = true;
+    S.sel = null; $("selbar").hidden = true; $("selColonne").hidden = true; finGeste();
     // La zone encadrée est toujours masquée, quoi que la lecture trouve ensuite.
     maskRect(p, rect); afterEdit();
     try {
@@ -896,6 +1187,27 @@
     } catch (e) { setStatus("La lecture du texte a échoué : la zone a été masquée seule."); return; }
     const elements = elementsDeSelection(p, rect);
     if (!elements.length) { setStatus("Aucune information à chercher dans cette zone : elle a été masquée seule."); return; }
+    // Plusieurs éléments : on montre ce qui sera cherché, pour décocher les mots ordinaires (un titre, un en-tête de colonne).
+    if (elements.length >= 2) { setStatus(""); choisirElements(p, rect, elements); return; }
+    chercherPareils(p, rect, elements);
+  });
+  function choisirElements(p, rect, elements) {
+    const box = $("chercheListe"); box.textContent = "";
+    elements.forEach((el, i) => {
+      const l = document.createElement("label"), c = document.createElement("input");
+      c.type = "checkbox"; c.checked = true; c.id = "cherche-" + i; c.value = el;
+      l.append(c, document.createTextNode(el)); box.append(l);
+    });
+    $("cherchePanel").hidden = false;
+    $("chercheOk").onclick = () => {
+      const choisis = [...box.querySelectorAll("input:checked")].map((c) => c.value);
+      $("cherchePanel").hidden = true;
+      if (choisis.length) chercherPareils(p, rect, choisis); else setStatus("Rien à chercher : la zone a été masquée seule.");
+    };
+    $("chercheAnnuler").onclick = () => { $("cherchePanel").hidden = true; setStatus("La zone a été masquée seule."); };
+  }
+  $("cherchePanel").addEventListener("pointerdown", (e) => e.stopPropagation());
+  async function chercherPareils(p, rect, elements) {
     const termes = [];
     for (const el of elements) {
       const m = motifDe(el);
@@ -919,7 +1231,7 @@
       ? `${items.length} élément${items.length > 1 ? "s" : ""} semblable${items.length > 1 ? "s" : ""} masqué${items.length > 1 ? "s" : ""} (cherché : ${liste}). Vérifiez-les avec les flèches ‹ ›.`
       : `Rien de semblable ailleurs (cherché : ${liste}). La zone a été masquée.`, true);
     montrerTrouves(items, true);
-  });
+  }
 
   /* ------------------ éléments trouvés : vue d'ensemble, étincelles, et on va les voir un par un */
   let scintille = 0;
@@ -1075,12 +1387,46 @@
     // Sur une page blanche avec peu de texte, les repères tombent sur le blanc : on ne touche à rien.
     const span = hi - lo;
     const etirer = span >= 60 && span < 230;
+    // Fond blanc (scan, PDF, capture d'écran) : le texte gris clair est assombri, pour être lu comme le reste.
+    let med = 0; acc = 0;
+    while (med < 255 && (acc += hist[med]) < total * 0.5) med++;
+    const blanc = med >= 228;
     for (let i = 0; i < d.length; i += 4) {
-      const v = etirer ? Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)) : d[i];
+      let v = etirer ? Math.max(0, Math.min(255, ((d[i] - lo) * 255) / span)) : d[i];
+      if (blanc) v = v >= med - 8 ? 255 : 255 * Math.pow(v / med, 2.4);
       d[i] = d[i + 1] = d[i + 2] = v;
     }
+    effacerTraits(d, c.width, c.height);
     x.putImageData(im, 0, 0);
     return c;
+  }
+  // Les traits d'un tableau gênent beaucoup la lecture : sur la copie lue (jamais sur l'image affichée),
+  // toute ligne sombre plus longue qu'un mot est effacée. Les lettres, elles, ne font jamais de si longs traits.
+  function effacerTraits(d, W, H) {
+    const Lh = Math.max(60, Math.round(W * 0.05)), Lv = Math.max(60, Math.round(H * 0.035));
+    const sombre = (i) => d[i * 4] < 150;
+    const blanchir = [];
+    for (let y = 0; y < H; y++) {
+      let deb = -1;
+      for (let x = 0; x <= W; x++) {
+        const s = x < W && sombre(y * W + x);
+        if (s && deb < 0) deb = x;
+        if (!s && deb >= 0) { if (x - deb >= Lh) blanchir.push([deb, y, x - deb, 1]); deb = -1; }
+      }
+    }
+    for (let x = 0; x < W; x++) {
+      let deb = -1;
+      for (let y = 0; y <= H; y++) {
+        const s = y < H && sombre(y * W + x);
+        if (s && deb < 0) deb = y;
+        if (!s && deb >= 0) { if (y - deb >= Lv) blanchir.push([x, deb, 1, y - deb]); deb = -1; }
+      }
+    }
+    // Un peu de marge autour du trait : son bord gris est effacé aussi.
+    for (const [x0, y0, w, h] of blanchir) {
+      for (let y = Math.max(0, y0 - (h === 1 ? 1 : 0)); y < Math.min(H, y0 + h + (h === 1 ? 1 : 0)); y++)
+        for (let x = Math.max(0, x0 - (w === 1 ? 1 : 0)); x < Math.min(W, x0 + w + (w === 1 ? 1 : 0)); x++) { const i = (y * W + x) * 4; d[i] = d[i + 1] = d[i + 2] = 255; }
+    }
   }
 
   async function ocr(p) {
@@ -1104,8 +1450,8 @@
       if (splitWords) t.split(/\s+/).filter((w) => w.length >= 3).forEach((w) => out.push({ type, value: t, key, needle: w }));
     });
     add("tNames", "PERSONNE", true); add("tAddr", "ADRESSE", false); add("tOther", "DONNEE", false);
-    // Dernier balayage : ce qui a déjà été masqué quelque part est cherché partout ailleurs.
-    (S.balayage || []).forEach((t) => {
+    // Dernier balayage, valeurs lues après une étiquette (« Nom : … ») et zones référencées : cherchées partout ailleurs.
+    (S.balayage || []).concat(S.appris || []).forEach((t) => {
       out.push(t);
       if (t.type === "PERSONNE") t.value.split(/\s+/).filter((w) => w.length >= 3).forEach((w) => out.push({ ...t, needle: w }));
     });
@@ -1195,8 +1541,12 @@
       for (const t of terms) {
         if (t.needle) continue;
         const cherches = K.motsACherche(t.value);
+        // Au-delà de quatre mots, c'est une liste (plusieurs personnes, plusieurs références) : un numéro par mot.
+        const liste = cherches.length > 4;
         words.forEach((w, i) => {
-          if (!used.has(i) && cherches.some((c) => K.ressemble(w.text, c))) take(rr, rr[i][0], rr[i][1], t.type, t.value, t.key);
+          if (used.has(i)) return;
+          const c = cherches.find((x) => K.ressemble(w.text, x));
+          if (c) take(rr, rr[i][0], rr[i][1], t.type, liste ? c : t.value, liste ? t.type + "|" + norm(c) : t.key);
         });
       }
     }
@@ -1213,6 +1563,8 @@
         await ocr(list[i]);
         detect(list[i]);
       }
+      // Un nom trouvé après « Nom : » est ensuite cherché partout, sur toutes les pages, avec le même numéro.
+      if (apprendreEtiquettes()) S.pages.forEach((p) => { if (p.lines) detect(p); });
       changed(); render();
       const n = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.active).length, 0);
       const flagged = S.pages.reduce((s, p) => s + p.boxes.filter((b) => b.flag).length, 0);
@@ -1244,6 +1596,27 @@
     detectPages(S.pages); // relit si besoin, puis masque les nouveaux termes partout
   }));
 
+  // Les valeurs qui suivent une étiquette de personne ou d'adresse deviennent des termes à chercher partout.
+  // La clé est la même que celle de la valeur trouvée après l'étiquette : le même numéro partout (PERSONNE_1…).
+  const TYPES_APPRIS = ["PERSONNE", "ADRESSE"];
+  function apprendreEtiquettes() {
+    S.appris = S.appris || [];
+    const vus = new Set(S.appris.map((t) => t.key));
+    let nouveau = false;
+    for (const p of S.pages) for (const l of p.lines || []) {
+      const raw = l.words.map((w) => w.text).join(" ");
+      for (const v of K.valeursApresEtiquettes(raw)) {
+        const type = v.etiquette.type;
+        if (!TYPES_APPRIS.includes(type) || /\d{3,}/.test(v.valeur) && type === "PERSONNE") continue;
+        if (!K.motsACherche(v.valeur).length) continue;
+        const key = type + "|" + norm(v.valeur);
+        if (vus.has(key)) continue;
+        vus.add(key); S.appris.push({ type, value: v.valeur, key, appris: true }); nouveau = true;
+      }
+    }
+    return nouveau;
+  }
+
   function renderLegend() {
     const used = new Set();
     S.pages.forEach((p) => p.boxes.forEach((b) => { if (b.active) used.add(b.token); }));
@@ -1257,7 +1630,7 @@
   // La mention en bas des documents envoyés. Sans le mode strict, elle est toujours là.
   // Seul un document contrôlé en mode strict peut partir sans mention, si l'utilisateur le choisit.
   const avecMention = () => !strict || $("optMention").checked;
-  const texteMention = () => "Masqué avec Kerckhoffs · " + (strict ? "contrôlé" : "non contrôlé") + " en mode strict";
+  const texteMention = () => "Masqué avec Kerckhoffs · " + (strict ? "vérifié point par point" : "non vérifié point par point");
   function avecBande(c, masked) {
     if (!masked || !avecMention()) return c;
     const h = Math.max(22, Math.round(c.width * 0.028));
@@ -1333,9 +1706,16 @@
     return S.pages.map((p, pi) => {
       const hit = masked ? strokeMask(p) : () => false;
       const out = S.pages.length > 1 ? [`--- Page ${pi + 1} ---`] : [];
+      const dans = (r, x, y) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
       for (const line of p.lines) {
         const parts = [], done = new Set();
+        const pousser = (s) => { if (parts[parts.length - 1] !== s) parts.push(s); };
         for (const w of line.words) {
+          if (masked) {
+            const mx = (w.bbox.x0 + w.bbox.x1) / 2, my = (w.bbox.y0 + w.bbox.y1) / 2;
+            const st = p.strokes.find((s) => (s.kind === "rect" && dans(s, mx, my)) || (s.etiq && s.etiq.rects.some((r) => dans(r, mx, my))));
+            if (st) { const e = st.ref || st.etiq; pousser(e ? tokenFor(e.key, e.type, e.value) : "[MASQUÉ]"); continue; }
+          }
           const b = masked && p.boxes.find((bx) => bx.active && bx.words.includes(w));
           if (b) { if (!done.has(b)) { parts.push(b.token); done.add(b); } continue; }
           const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
@@ -1405,14 +1785,20 @@
     try { save(await prepared()); } catch (e) { setStatus("L'export a échoué. Réessayez."); }
   }
   $("btnSave").addEventListener("click", () => { closeSheet(); avecCerbere(doSave); });
+  $("btnShare").addEventListener("click", () => closeSheet());
 
+  // Ce navigateur sait-il partager un fichier vers une autre application ? (Firefox sur Android, la plupart des ordinateurs : non)
+  function partageFichiers() {
+    try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["x"], "x.jpg", { type: "image/jpeg" })] })); }
+    catch (e) { return false; }
+  }
   async function doShare() {
     let out;
     try { out = await prepared(); } catch (e) { setStatus("L'export a échoué. Réessayez."); return; }
     const data = fmt() === "text" ? { text: out.text } : { files: out.files };
     if (!navigator.share || (data.files && navigator.canShare && !navigator.canShare(data))) {
       save(out);
-      setStatus("Le partage n'est pas disponible ici : le fichier a été enregistré.");
+      setStatus("Ce navigateur ne sait pas partager un fichier : il a été enregistré dans vos Téléchargements. Vous pouvez aussi le copier (menu, « Copier l'image »), puis le coller dans un message ou une IA.", true);
       return;
     }
     try {
@@ -1450,7 +1836,7 @@
       setStatus("La copie n'est pas autorisée ici. Utilisez « Partager » ou « Enregistrer ».");
     }
   }
-  $("btnCopy").addEventListener("click", () => avecCerbere(doCopy));
+  $("btnCopy").addEventListener("click", () => { closeSheet(); avecCerbere(doCopy); });
 
   /* ------------------ profil : les mots appris, gardés dans un QR code chiffré que VOUS conservez */
   // Le profil ne contient que des listes de mots et des formes simples (ex. « 99-999 »), jamais de code ni de document.
@@ -1758,10 +2144,61 @@
       .map((l) => { const m = l.h * 0.5; return { x: (l.x0 - m) / k, y: (l.y0 - m) / k, w: (l.x1 - l.x0 + 1 + 2 * m) / k, h: (l.y1 - l.y0 + 1 + 2 * m) / k }; });
   }
 
+  /* « Ça dépasse ici » : juste à l'extérieur de chaque bord d'un rectangle tracé à la main, on cherche de l'encre.
+   * Les traits d'un tableau (une ligne sombre sur presque toute la longueur) ne comptent pas : ce n'est pas de l'écriture. */
+  function encreDansBande(p, b, vertical, cache) {
+    const px = pixelsDe(p, b.x, b.y, b.x + b.w, b.y + b.h);
+    if (!px) return false;
+    const { X0, Y0, W, H, lum } = px;
+    const n1 = vertical ? W : H, n2 = vertical ? H : W; // n1 : travers la bande, n2 : le long du bord
+    let encre = 0;
+    for (let a = 0; a < n1; a++) {
+      let s = 0;
+      for (let c = 0; c < n2; c++) { const x = vertical ? a : c, y = vertical ? c : a; if (lum[y * W + x] < 140 && !cache(X0 + x + 0.5, Y0 + y + 0.5)) s++; }
+      if (s / n2 > 0.6) continue; // un trait de tableau
+      encre += s;
+    }
+    return encre >= Math.max(6, n1 * n2 * 0.02);
+  }
+  function bordsQuiDepassent(p, cache) {
+    const out = [];
+    const e = Math.max(3, Math.round(Math.min(p.img.width, p.img.height) * 0.004));
+    p.strokes.forEach((st) => {
+      if (st.kind !== "rect" || st.w < 6 || st.h < 6) return;
+      const cotes = [
+        ["g", { x: st.x - e, y: st.y, w: e, h: st.h }, true], ["d", { x: st.x + st.w, y: st.y, w: e, h: st.h }, true],
+        ["h", { x: st.x, y: st.y - e, w: st.w, h: e }, false], ["b", { x: st.x, y: st.y + st.h, w: st.w, h: e }, false],
+      ];
+      for (const [cote, bande, vertical] of cotes) {
+        if (bande.x < 0 || bande.y < 0 || bande.x + bande.w > p.img.width || bande.y + bande.h > p.img.height) continue;
+        if (encreDansBande(p, bande, vertical, cache)) out.push({ st, cote, bande: { x: bande.x - e, y: bande.y - e, w: bande.w + 2 * e, h: bande.h + 2 * e } });
+      }
+    });
+    return out.slice(0, 12);
+  }
+  // Élargir : le bord avance jusqu'à ce qu'il n'y ait plus d'encre juste derrière (au plus de quelques lettres).
+  function elargir(p, d) {
+    const st = d.st, e = Math.max(3, Math.round(Math.min(p.img.width, p.img.height) * 0.004));
+    const avant = { x: st.x, y: st.y, w: st.w, h: st.h };
+    const cache = couvert(p);
+    for (let i = 0; i < 60; i++) {
+      const b = d.cote === "g" ? { x: st.x - e, y: st.y, w: e, h: st.h } : d.cote === "d" ? { x: st.x + st.w, y: st.y, w: e, h: st.h }
+        : d.cote === "h" ? { x: st.x, y: st.y - e, w: st.w, h: e } : { x: st.x, y: st.y + st.h, w: st.w, h: e };
+      if (b.x < 0 || b.y < 0 || b.x + b.w > p.img.width || b.y + b.h > p.img.height) break;
+      if (!encreDansBande(p, b, d.cote === "g" || d.cote === "d", cache)) break;
+      if (d.cote === "g") { st.x -= e; st.w += e; } else if (d.cote === "d") st.w += e; else if (d.cote === "h") { st.y -= e; st.h += e; } else st.h += e;
+    }
+    // un peu de marge, pour couvrir le bord des lettres
+    if (d.cote === "g") { st.x -= e; st.w += e; } else if (d.cote === "d") st.w += e; else if (d.cote === "h") { st.y -= e; st.h += e; } else st.h += e;
+    st.moy = null;
+    history.push({ type: "resize", page: p, item: st, avant });
+  }
+
   // Les combinaisons qui trahissent : un code postal, un âge, le sexe, une information de santé.
   const COMBINAISON = [
     { cat: "un code postal", re: /\b(?:[A-Z]{1,2}-)?\d{4,5}\s+[A-ZÀ-Ý][a-zà-ÿ'’-]{2,}/g },
     { cat: "un âge ou une date de naissance", re: /\b\d{1,3}\s?(?:ans|years?|Jahre)\b|\b(?:âge|age|alter)\s*:?\s*\d{1,3}\b|\b(?:née?|naissance|geboren|born)\b/gi },
+    { cat: "une situation professionnelle", re: /\b(?:chômage|chomage|chômeu(?:r|se)|sans emploi|demandeu(?:r|se) d'emploi|licencié(?:e)?|licenciement|en recherche d'emploi|arbeitslos)/gi },
     { cat: "le sexe", re: /\b(?:homme|femme|masculin|féminin|feminin|männlich|weiblich|male|female)\b|\bsexe\s*:?\s*[MFmf]\b/gi },
   ];
 
@@ -1861,6 +2298,8 @@
       try {
         zonesSansTexte(p, cache).forEach((r) => ajouter({ tete: 4, label: "Écriture non lue ici", texte: "texte trop petit, flou, ou manuscrit", rects: [r], nonLu: true }));
       } catch (e) { /* analyse impossible sur cette image */ }
+      // Tête 3 ter : de l'encre qui touche le bord d'un rectangle tracé à la main (un mot qui continue sous le noir)
+      try { bordsQuiDepassent(p, cache).forEach((d) => ajouter({ tete: 3, label: "Ça dépasse ici", texte: "de l'écriture touche le bord du masque", rects: [d.bande], depasse: d })); } catch (e) {}
       // Deux catégories ou plus encore visibles : on prévient, page par page.
       if (combinaison.size >= 2) {
         for (const [cat, v] of combinaison) items.push({ tete: 0, page: pi, label: "Peut identifier avec le reste : " + cat, texte: v.texte, rects: rectsDe(v.mots), combinaison: true });
@@ -1877,7 +2316,7 @@
     const nl = restants.filter((it) => it.nonLu).length;
     $("cerbereIntro").textContent = (balayageInfo ? balayageInfo + " " : "") + (restants.length
       ? `${restants.length} point${restants.length > 1 ? "s" : ""} à vérifier dans ce qui reste visible.` +
-        (nl && !strict ? ` Dont ${nl} zone${nl > 1 ? "s" : ""} d'écriture non lue${nl > 1 ? "s" : ""}, en orange sur l'image : ${nl > 1 ? "elles seraient" : "elle serait"} à vérifier en mode strict.` : "")
+        (nl && !strict ? ` Dont ${nl} zone${nl > 1 ? "s" : ""} d'écriture non lue${nl > 1 ? "s" : ""}, en orange sur l'image : ${nl > 1 ? "elles seraient" : "elle serait"} à vérifier au niveau Strict.` : "")
       : "Rien à signaler. Vous pouvez envoyer.");
     $("cerbereAlerte").hidden = !restants.some((it) => it.combinaison);
     $("cerbereBalayage").hidden = strict;
@@ -1886,6 +2325,17 @@
     $("cerbereSend").textContent = strict ? "Aperçu final" : (restants.length ? "Envoyer quand même" : "Envoyer");
     $("cerbereSend").hidden = strict && restants.length > 0; // en mode strict : tout traiter d'abord
     $("cerbereStrictNote").hidden = !(strict && restants.length > 0);
+    // La mention qui partira avec le document, avant l'envoi et pas après.
+    const men = $("cerbereMention"); men.textContent = "";
+    if ($("optMask").checked) {
+      men.append(document.createTextNode(avecMention() ? `Ce document portera en bas la mention « ${texteMention()} ».` : "Ce document partira sans mention."));
+      if (strict) {
+        const b = document.createElement("button"); b.type = "button"; b.className = "btn small";
+        b.textContent = avecMention() ? "La retirer" : "La remettre";
+        b.addEventListener("click", () => { $("optMention").checked = !$("optMention").checked; changed(); cerbereOk = -1; afficherCerbere(); });
+        men.append(b);
+      } else men.append(document.createTextNode(" Seul le niveau Strict permet de la retirer."));
+    }
     cerbereItems.forEach((it, i) => {
       if (it.fait) return;
       const li = document.createElement("li");
@@ -1896,10 +2346,11 @@
       const v = document.createElement("span"); v.textContent = "« " + it.texte + " »" + (S.pages.length > 1 ? ` · page ${it.page + 1}` : "");
       t.append(l, v);
       t.addEventListener("click", () => montrer(it));
-      const m = document.createElement("button"); m.type = "button"; m.className = "btn small dark"; m.textContent = "Masquer";
+      const m = document.createElement("button"); m.type = "button"; m.className = "btn small dark"; m.textContent = it.depasse ? "Élargir" : "Masquer";
       m.addEventListener("click", () => {
         const p = S.pages[it.page];
-        it.rects.forEach((r) => maskRect(p, r));
+        if (it.depasse) elargir(p, it.depasse);
+        else it.rects.forEach((r) => maskRect(p, r));
         it.fait = true; S.flash = null; afterEdit(); afficherCerbere();
       });
       const g = document.createElement("button"); g.type = "button"; g.className = "btn small"; g.textContent = "Laisser";
@@ -1916,18 +2367,24 @@
     render();
   }
 
-  // Mode strict (professionnels) : chaque alerte doit être traitée, puis un aperçu final est obligatoire.
-  let strict = false;
-  try { strict = localStorage.getItem("kerckhoffs-strict") === "1"; } catch (e) {}
-  $("optStrict").checked = strict;
-  $("mentionBloc").hidden = !strict;
-  $("optStrict").addEventListener("change", () => {
-    strict = $("optStrict").checked;
-    try { localStorage.setItem("kerckhoffs-strict", strict ? "1" : "0"); } catch (e) {}
-    $("mentionBloc").hidden = !strict;
+  // Remove Before Flight, niveau Strict (par défaut) : chaque point doit être traité, dernière relecture automatique,
+  // puis un aperçu final. Niveau Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier.
+  let strict = true;
+  try { strict = localStorage.getItem("kerckhoffs-strict") !== "0"; } catch (e) {}
+  function majNiveau() {
+    $("niveauStrict").checked = strict; $("niveauNormal").checked = !strict; $("optStrict").checked = strict;
+    $("niveauNote").textContent = strict
+      ? "Strict : chaque point doit être traité, Kerckhoffs fait une dernière relecture, puis un aperçu s'affiche avant l'envoi."
+      : "Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier, et la mention reste toujours en bas du document.";
+    $("optMention").disabled = !strict;
     if (!strict) $("optMention").checked = true;
-    cerbereOk = -1; render();
-  });
+  }
+  majNiveau();
+  document.querySelectorAll('input[name="niveau"]').forEach((r) => r.addEventListener("change", () => {
+    strict = r.value === "strict";
+    try { localStorage.setItem("kerckhoffs-strict", strict ? "1" : "0"); } catch (e) {}
+    majNiveau(); cerbereOk = -1; changed(); render();
+  }));
   $("optMention").addEventListener("change", () => { changed(); });
 
   let balayageInfo = "", cerbereSansEnvoi = false;
@@ -2001,9 +2458,10 @@
     cerbereItems = items; cerbereSuite = action;
     closeSheet();
     $("cerbere").hidden = false; // sans voile sombre : l'image reste visible au-dessus
+    majPanneau();
     afficherCerbere();
   }
-  function fermerCerbere() { $("cerbere").hidden = true; $("backdrop").hidden = true; S.flash = null; S.orange = null; render(); }
+  function fermerCerbere() { $("cerbere").hidden = true; $("backdrop").hidden = true; S.flash = null; S.orange = null; majPanneau(); render(); }
   $("cerbereBack").addEventListener("click", fermerCerbere);
   $("cerbereSend").addEventListener("click", () => {
     const suite = cerbereSuite;
@@ -2017,17 +2475,9 @@
   try { animOn = localStorage.getItem("kerckhoffs-animation") !== "0"; } catch (e) {}
   const reduireMouvements = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
   const animationPossible = () => animOn && !reduireMouvements() && $("optMask").checked && !!page();
-  function majAnim() {
-    $("animToggle").setAttribute("aria-pressed", String(animOn));
-    $("animToggle").title = animOn ? "Animation avant l'envoi : activée. Toucher pour la couper." : "Animation avant l'envoi : coupée. Toucher pour la remettre.";
-    $("optAnim").checked = animOn;
-  }
+  function majAnim() { $("optAnim").checked = animOn; }
   function choisirAnim(v) { animOn = v; try { localStorage.setItem("kerckhoffs-animation", v ? "1" : "0"); } catch (e) {} majAnim(); }
   majAnim();
-  $("animToggle").addEventListener("click", () => {
-    choisirAnim(!animOn);
-    setStatus(animOn ? "Animation avant l'envoi : activée." : "Animation avant l'envoi : coupée. Ce choix est gardé, même après une nouvelle version.");
-  });
   $("optAnim").addEventListener("change", () => choisirAnim($("optAnim").checked));
 
   // Après la validation : l'animation, puis un bouton « Envoyer » (le menu de partage du téléphone exige un toucher).
@@ -2038,13 +2488,16 @@
     jouerEnvol().then(() => {
       if (strict) { fermerEnvol(); ouvrirApercu(suite); return; }
       envolSuite = suite;
-      $("envolEnvoyer").textContent = suite === doCopy ? "Copier" : suite === doSave ? "Enregistrer" : "Envoyer";
+      const sansPartage = suite === doShare && fmt() !== "text" && !partageFichiers();
+      $("envolEnvoyer").textContent = suite === doCopy ? "Copier" : suite === doSave || sansPartage ? "Enregistrer" : "Envoyer";
+      $("envolCopier").hidden = !sansPartage;
       $("envolBar").hidden = false; $("envolPasser").hidden = true;
     });
   }
   function fermerEnvol() { $("envol").hidden = true; envolSuite = null; }
   $("envolRevenir").addEventListener("click", fermerEnvol);
   $("envolEnvoyer").addEventListener("click", () => { const s2 = envolSuite; fermerEnvol(); if (s2) s2(); });
+  $("envolCopier").addEventListener("click", () => { fermerEnvol(); doCopy(); });
 
   function jouerEnvol() {
     return new Promise((fini) => {
@@ -2055,57 +2508,66 @@
       const x = cvE.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0);
       const s = Math.min((W - 24) / p.img.width, (H - 24) / p.img.height);
       const ox = (W - p.img.width * s) / 2, oy = 12 + (H - 24 - p.img.height * s) / 2, pw = p.img.width * s, ph = p.img.height * s;
-      // L'image qui partira, et le papier « troué » : l'original, avec les zones masquées en blanc.
+      // L'image qui partira (la version publique), et l'original : au départ, on voit encore les données privées.
       const fin = avecBande(finalCanvas(p, true), true);
-      const papier = document.createElement("canvas"); papier.width = p.img.width; papier.height = p.img.height;
-      const px = papier.getContext("2d"); px.drawImage(p.img, 0, 0);
-      p.strokes.forEach((st) => strokePath(px, st, "#fff"));
-      px.fillStyle = "#fff";
       const zones = [];
-      p.boxes.filter((b) => b.active).forEach((b) => (b.rects || [b]).forEach((r) => { px.fillRect(r.x, r.y, r.w, r.h); zones.push(r); }));
-      p.strokes.forEach((st) => {
-        if (st.kind === "rect") zones.push(st);
-        else { const xs = st.pts.map((q) => q[0]), ys = st.pts.map((q) => q[1]), m = st.w / 2; zones.push({ x: Math.min(...xs) - m, y: Math.min(...ys) - m, w: Math.max(...xs) - Math.min(...xs) + st.w, h: Math.max(...ys) - Math.min(...ys) + st.w }); }
-      });
-      // Les grains de sable : de simples taches noires, prises dans les zones masquées. Jamais les vraies lettres.
-      const cache = couvert(p);
-      const aire = zones.reduce((a, r) => a + Math.max(0, r.w) * Math.max(0, r.h), 0);
-      const pas = Math.max(2, Math.sqrt(aire / 3500));
-      const gx = [], gy = [];
-      zones.forEach((r) => {
-        for (let yy = r.y; yy < r.y + r.h; yy += pas) for (let xx = r.x; xx < r.x + r.w; xx += pas) if (cache(xx + pas / 2, yy + pas / 2)) { gx.push(xx); gy.push(yy); }
-      });
-      const n = Math.min(gx.length, 6000);
+      const copie = (r) => ({ x: r.x, y: r.y, w: r.w, h: r.h });
+      p.boxes.filter((b) => b.active).forEach((b) => (b.rects || [b]).forEach((r) => zones.push(copie(r))));
+      p.strokes.forEach((st) => { zones.push(copie(cadreDe(st))); if (st.etiq) st.etiq.rects.forEach((r) => zones.push(copie(r))); });
+      // Chaque zone se transforme à son tour, le coup de vent passant de gauche à droite.
       let xmin = Infinity, xmax = -Infinity;
-      for (let i = 0; i < n; i++) { if (gx[i] < xmin) xmin = gx[i]; if (gx[i] > xmax) xmax = gx[i]; }
-      if (!n) { xmin = 0; xmax = 1; }
+      zones.forEach((r) => { if (r.x < xmin) xmin = r.x; if (r.x > xmax) xmax = r.x; });
+      if (!zones.length) { xmin = 0; xmax = 1; }
+      zones.forEach((r) => { r.dep = 0.7 + ((r.x - xmin) / (xmax - xmin + 1)) * 0.5; });
+      // Les grains de sable : l'encre des lettres privées, qui tombe. Ils ne quittent jamais l'écran de l'appareil.
+      const aire = zones.reduce((a, r) => a + Math.max(0, r.w) * Math.max(0, r.h), 0);
+      const pas = Math.max(2, Math.sqrt(aire / 5000));
+      const gx = [], gy = [], gc = [], gd = [];
+      zones.forEach((r) => {
+        const W = Math.max(1, Math.round(r.w / pas)), H = Math.max(1, Math.round(r.h / pas));
+        const c = document.createElement("canvas"); c.width = W; c.height = H;
+        const cx = c.getContext("2d", { willReadFrequently: true });
+        try { cx.drawImage(p.img, r.x, r.y, r.w, r.h, 0, 0, W, H); } catch (e) { return; }
+        const d = cx.getImageData(0, 0, W, H).data;
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+          const o = (j * W + i) * 4;
+          if (d[o] * 0.299 + d[o + 1] * 0.587 + d[o + 2] * 0.114 < 150) { gx.push(r.x + i * pas); gy.push(r.y + j * pas); gc.push(`rgb(${d[o]},${d[o + 1]},${d[o + 2]})`); gd.push(r.dep); }
+        }
+      });
+      const n = Math.min(gx.length, 7000);
       const depart = new Float32Array(n), vx = new Float32Array(n), vy = new Float32Array(n);
-      for (let i = 0; i < n; i++) {
-        depart[i] = 0.75 + ((gx[i] - xmin) / (xmax - xmin + 1)) * 0.45 + Math.random() * 0.2; // le coup de vent passe de gauche à droite
-        vx[i] = (30 + Math.random() * 90); vy[i] = -Math.random() * 80;
-      }
-      const taille = Math.max(1.5, pas * s * 1.1), g = 1500, duree = 2.5;
+      for (let i = 0; i < n; i++) { depart[i] = gd[i] + Math.random() * 0.18; vx[i] = 30 + Math.random() * 90; vy[i] = -Math.random() * 80; }
+      const taille = Math.max(1.5, pas * s * 1.1), g = 1500, duree = 2.6;
       let t0 = null, finiTot = false;
       const finir = () => { if (finiTot) return; finiTot = true; dessiner(duree + 1); fini(); };
       const passer = () => finir();
       $("envolPasser").onclick = passer; cvE.onclick = passer;
       function dessiner(t) {
         x.clearRect(0, 0, W, Ht);
-        // 1. le papier revient, sauf les zones masquées
-        const aP = Math.min(1, Math.max(0, (t - 0.15) / 0.45));
-        x.globalAlpha = aP; x.fillStyle = "#fff"; x.fillRect(ox, oy, pw, ph); x.drawImage(papier, ox, oy, pw, ph);
-        // 2. les grains : d'abord en place (le noir des zones masquées), puis ils tombent
-        x.globalAlpha = 1; x.fillStyle = "#000";
+        // 1. l'original apparaît, avec ses données privées
+        const aP = Math.min(1, Math.max(0, (t - 0.15) / 0.4));
+        x.globalAlpha = aP; x.fillStyle = "#fff"; x.fillRect(ox, oy, pw, ph); x.drawImage(p.img, ox, oy, pw, ph);
+        // 2. zone par zone, la version publique prend la place : le masque et son étiquette (NOM_1…)
+        x.globalAlpha = 1;
+        zones.forEach((r) => {
+          const a = Math.min(1, Math.max(0, (t - r.dep) / 0.35));
+          if (a <= 0) return;
+          x.globalAlpha = a * aP;
+          x.drawImage(fin, r.x, r.y, r.w, r.h, ox + r.x * s, oy + r.y * s, r.w * s, r.h * s);
+        });
+        // 3. les lettres tombent en sable
+        x.globalAlpha = 1;
         for (let i = 0; i < n; i++) {
           const dt = t - depart[i];
-          let X = ox + gx[i] * s, Y = oy + gy[i] * s, tl = taille;
-          if (t < 0.15) continue;
-          if (dt > 0) { X += vx[i] * dt; Y += vy[i] * dt + 0.5 * g * dt * dt; tl = taille * Math.max(0.4, 1 - dt * 0.6); }
+          if (dt <= 0 || t < 0.15) continue;
+          const X = ox + gx[i] * s + vx[i] * dt, Y = oy + gy[i] * s + vy[i] * dt + 0.5 * g * dt * dt;
           if (Y > Ht + 10) continue;
+          x.fillStyle = gc[i];
+          const tl = taille * Math.max(0.4, 1 - dt * 0.6);
           x.fillRect(X, Y, tl, tl);
         }
-        // 3. l'image qui part se pose
-        const aF = Math.min(1, Math.max(0, (t - 1.85) / 0.5));
+        // 4. la version publique se pose, avec sa mention
+        const aF = Math.min(1, Math.max(0, (t - 1.95) / 0.5));
         if (aF > 0) { x.globalAlpha = aF; x.drawImage(fin, ox, oy, pw, (fin.height / fin.width) * pw); x.globalAlpha = 1; }
         // 0. le flash
         const aFl = Math.max(0, 1 - t / 0.3);
@@ -2196,15 +2658,9 @@
   $("goCam").addEventListener("click", () => { openWork(); ouvrirCamera(); });
   $("goImport").addEventListener("click", () => { openWork(); $("inFile").click(); });
 
-  // Outils : pinceau, rectangle et retour toujours visibles ; déplacer, recadrer et gomme derrière « Plus ».
-  $("toolPlus").addEventListener("click", () => {
-    const ouvert = $("toolbar").classList.toggle("plus-ouvert");
-    $("toolPlus").setAttribute("aria-expanded", String(ouvert));
-    $("toolPlusTexte").textContent = ouvert ? "Moins" : "Plus";
-  });
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.7.0";
+  const VERSION_APP = "0.8.0";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
@@ -2359,6 +2815,121 @@
   }
   $("majPlusTard").addEventListener("click", () => { $("majBandeau").hidden = true; });
 
+  /* ------------- ouvrir un document autrement : coller, glisser, capturer l'écran, recevoir depuis « Partager » */
+  const ordinateur = !estTelephone();
+  ["choixPC", "mColler", "mCapture", "emptyColler"].forEach((id) => { $(id).hidden = !ordinateur; });
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) { $("goCapture").hidden = true; $("mCapture").hidden = true; }
+  const accepte = (f) => f && (/^image\//.test(f.type) || f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""));
+  function ouvrirFichiers(files) {
+    files = files.filter(accepte);
+    if (!files.length) return false;
+    closeSheet();
+    if ($("work").hidden) openWork();
+    addFiles(files);
+    return true;
+  }
+  // Ctrl+V : une capture d'écran collée s'ouvre directement. Rien n'est écrit sur le disque.
+  document.addEventListener("paste", (e) => {
+    const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+    if (files.some(accepte)) { e.preventDefault(); ouvrirFichiers(files); }
+  });
+  async function collerPressePapiers() {
+    try {
+      const items = await navigator.clipboard.read();
+      const files = [];
+      for (const it of items) for (const type of it.types) if (/^image\//.test(type)) files.push(new File([await it.getType(type)], "capture.png", { type }));
+      if (ouvrirFichiers(files)) return;
+      setStatus("Aucune image dans le presse-papiers. Faites d'abord une capture (Windows : Win+Maj+S ; Mac : Cmd+Maj+4).", true);
+      if ($("work").hidden) alerteAccueil("Aucune image dans le presse-papiers. Faites d'abord une capture (Windows : Win+Maj+S ; Mac : Cmd+Maj+4), puis Ctrl+V.");
+    } catch (e) {
+      if ($("work").hidden) alerteAccueil("Appuyez simplement sur Ctrl+V (Cmd+V sur Mac) pour coller votre capture.");
+      else setStatus("Appuyez simplement sur Ctrl+V (Cmd+V sur Mac) pour coller votre capture.", true);
+    }
+  }
+  function alerteAccueil(texte) { bandeau(texte); }
+  $("goColler").addEventListener("click", collerPressePapiers);
+  $("mColler").addEventListener("click", () => { closeSheet(); collerPressePapiers(); });
+  $("emptyColler").addEventListener("click", collerPressePapiers);
+  // Glisser un fichier sur la page
+  let glisse = 0;
+  const avecFichiers = (e) => e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+  document.addEventListener("dragenter", (e) => { if (!avecFichiers(e)) return; e.preventDefault(); glisse++; if (!$("work").hidden) $("depot").hidden = false; });
+  document.addEventListener("dragover", (e) => { if (avecFichiers(e)) e.preventDefault(); });
+  document.addEventListener("dragleave", () => { glisse = Math.max(0, glisse - 1); if (!glisse) $("depot").hidden = true; });
+  document.addEventListener("drop", (e) => {
+    if (!avecFichiers(e)) return;
+    e.preventDefault(); glisse = 0; $("depot").hidden = true;
+    ouvrirFichiers([...e.dataTransfer.files]);
+  });
+  // Capturer l'écran : une fenêtre ou un onglet, choisi par vous. Une seule image est prise, puis la capture s'arrête.
+  async function capturerEcran() {
+    closeSheet();
+    let flux2;
+    try { flux2 = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }); } catch (e) { return; }
+    try {
+      const v = document.createElement("video"); v.muted = true; v.playsInline = true; v.srcObject = flux2;
+      try { await v.play(); } catch (e) {}
+      for (let i = 0; i < 20 && !v.videoWidth; i++) await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 250));
+      const c = toCanvas(v, v.videoWidth, v.videoHeight);
+      if ($("work").hidden) openWork();
+      addPages([newPage(c, "capture")]);
+    } finally { flux2.getTracks().forEach((tr) => tr.stop()); }
+  }
+  $("goCapture").addEventListener("click", capturerEcran);
+  $("mCapture").addEventListener("click", capturerEcran);
+  // « Partager » vers Kerckhoffs (Android, application installée) : le fichier est remis par le service worker,
+  // gardé un instant sur l'appareil, ouvert ici, puis effacé aussitôt.
+  async function recevoirPartage() {
+    if (!/[?&]partage=1/.test(location.search)) return false;
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+    const files = [];
+    try {
+      const c = await caches.open("kerckhoffs-partage");
+      for (const req of await c.keys()) {
+        const r = await c.match(req), b = await r.blob();
+        files.push(new File([b], decodeURIComponent(r.headers.get("x-nom") || "document"), { type: b.type }));
+      }
+      await caches.delete("kerckhoffs-partage");
+    } catch (e) {}
+    return ouvrirFichiers(files);
+  }
+
+  /* ---------------------------------------- clavier et souris, sur un ordinateur */
+  document.addEventListener("keydown", (e) => {
+    if ($("work").hidden || !$("profil").hidden || !$("apercu").hidden || !$("envol").hidden) return;
+    const champ = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !champ) { e.preventDefault(); $("undo").click(); return; }
+    if (champ) return;
+    if (e.key === " ") { espace = true; e.preventDefault(); return; }
+    if (e.key === "Escape") {
+      if (!$("sheet").hidden) closeSheet();
+      else if (!$("cerbere").hidden) fermerCerbere();
+      else if (!$("cherchePanel").hidden) $("chercheAnnuler").click();
+      else if (!$("refbar").hidden) $("refCancel").click();
+      else if (S.sel) $("selCancel").click();
+      else if (S.cadre) $("cropCancel").click();
+      else if (S.trouves) fermerTrouves();
+      else if (tool !== outilBase) setTool(outilBase);
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey || !page()) return;
+    const k = e.key.toLowerCase();
+    const zoomer = (f) => { const r = vp.getBoundingClientRect(), m = [r.width / 2, r.height / 2], img = toImg(r.left + m[0], r.top + m[1]);
+      const s = Math.min(S.view.fit * 12, Math.max(S.view.fit * 0.8, S.view.s * f)); S.view.s = s; S.view.tx = m[0] - img[0] * s; S.view.ty = m[1] - img[1] * s; applyView(); showFit(); };
+    if (k === "d") setTool("brush");
+    else if (k === "m") setTool("move");
+    else if (k === "r") setTool("rect");
+    else if (k === "g") setTool("erase");
+    else if (k === "+" || k === "=") zoomer(1.25);
+    else if (k === "-") zoomer(1 / 1.25);
+    else if (k === "0") { fitView(); render(); }
+    else return;
+    e.preventDefault();
+  });
+  document.addEventListener("keyup", (e) => { if (e.key === " ") espace = false; });
+  window.addEventListener("blur", () => { espace = false; });
+
   /* ---------------------------------------- installer Kerckhoffs comme une application */
   let invitation = null;
   const installee = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
@@ -2374,4 +2945,12 @@
     invitation = null; $("btnInstaller").hidden = true;
   });
   window.addEventListener("appinstalled", () => { $("installBloc").hidden = true; });
+
+  /* ---------------------------------------- au lancement : un document partagé, ou l'appareil photo tout de suite */
+  (async function lancement() {
+    if (await recevoirPartage()) { $("verif").hidden = true; return; }
+    const direct = () => estTelephone() && $("optCamDirecte").checked && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && $("work").hidden;
+    if ($("verif").hidden) { if (direct()) $("goCam").click(); }
+    else $("verifOk").addEventListener("click", () => { if (direct()) $("goCam").click(); });
+  })();
 })();
