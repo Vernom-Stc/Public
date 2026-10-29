@@ -54,7 +54,7 @@
     leaving: false,
   };
   // Pour les tests sur l'ordinateur du développeur uniquement (jamais sur l'adresse publique).
-  if (location.hostname === "localhost") window.__kerckhoffsTest = S;
+  if (location.hostname === "localhost") { window.__kerckhoffsTest = S; window.__kerckhoffsAuDessus = (p) => valeursAuDessus(p); }
   const cv = $("cv");
   const ctx = cv.getContext("2d");
   const page = () => S.pages[S.cur];
@@ -1673,10 +1673,81 @@
     return "";
   }
 
+  // Étiquettes au-dessus de la valeur (formulaires officiels) : une ligne faite seulement d'étiquettes,
+  // parfois empilée en plusieurs langues, puis la valeur sur la ligne juste dessous, dans la même colonne.
+  // Renvoie, pour chaque ligne qui porte une valeur, les morceaux à masquer : { debut, fin, type, valeur, etiquette }.
+  function valeursAuDessus(p) {
+    const L = (p.lines || []).map((l, i) => {
+      const ws = l.words.filter((w) => w.text && w.text.trim());
+      if (!ws.length) return null;
+      const x0 = Math.min(...ws.map((w) => w.bbox.x0)), x1 = Math.max(...ws.map((w) => w.bbox.x1));
+      const y0 = Math.min(...ws.map((w) => w.bbox.y0)), y1 = Math.max(...ws.map((w) => w.bbox.y1));
+      const texte = l.words.map((w) => w.text).join(" ");
+      return { i, x0, x1, y0, y1, h: Math.max(4, y1 - y0), texte, types: K.ligneEtiquette ? K.ligneEtiquette(texte) : null };
+    }).filter(Boolean);
+    // Les lignes sous « a », dans la colonne qui commence en x0 (celle de la première étiquette de la pile).
+    const dessous = (a, x0 = a.x0) => L.filter((b) => b !== a && b.y0 >= a.y1 - a.h * 0.3 && b.x0 >= x0 - a.h * 1.2 && b.x0 <= x0 + a.h * 3)
+      .sort((u, v) => u.y0 - v.y0);
+    // Une valeur plausible : assez de lettres ou de chiffres, et aucun mot d'étiquette (sinon c'est la suite de l'étiquette).
+    const nbSignes = (t) => t.replace(/[^A-Za-zÀ-ÿ0-9]/g, "").length;
+    const bruitLu = (x) => !/\d/.test(x.texte) && (nbSignes(x.texte) <= 3 || K.ligneVide(x.texte));
+    const avecMotEtiquette = (x) => x.texte.split(/[\s|\/]+/).some((w) => w.length > 1 && K.estMotEtiquette(w));
+    const sortie = new Map(), prises = new Set();
+    const ajouter = (v, a) => {
+      const morceaux = [], types = a.types;
+      let pos = 0;
+      v.texte.split("|").forEach((m, k) => {
+        const brut = m.replace(/^\s+|\s+$/g, ""), debut = v.texte.indexOf(brut, pos);
+        pos = debut + brut.length;
+        if (brut && /[A-Za-zÀ-ÿ0-9]/.test(brut) && debut >= 0)
+          morceaux.push({ debut, fin: debut + brut.length, type: types[Math.min(k, types.length - 1)], valeur: brut, etiquette: a.texte.split("|")[0].trim() });
+      });
+      if (morceaux.length) sortie.set(v.i, (sortie.get(v.i) || []).concat(morceaux));
+    };
+    // Étiquette à gauche, valeur à droite sur la même ligne (tableaux, cases « père / mère ») : une ou plusieurs colonnes.
+    for (const a of L) {
+      if (!a.types) continue;
+      const droite = L.filter((b) => b !== a && b.x0 > a.x1 && b.x0 - a.x1 < a.h * 6 && Math.abs((b.y0 + b.y1) / 2 - (a.y0 + a.y1) / 2) < a.h * 0.6 && !prises.has(b.i))
+        .sort((u, v) => u.x0 - v.x0);
+      const valeurs = [];
+      for (const b of droite) { if (b.types || avecMotEtiquette(b)) break; if (!bruitLu(b)) valeurs.push(b); }
+      if (!valeurs.length) continue;
+      prises.add(a.i);
+      valeurs.forEach((v) => { prises.add(v.i); ajouter(v, a); });
+    }
+    for (const a of L) {
+      if (!a.types || prises.has(a.i)) continue;
+      // Remonter la pile : on part de la dernière étiquette de la pile (les traductions empilées dessous).
+      let bas = a, pile = [a];
+      const bruit = bruitLu; // taches, traits, filigrane mal lu, formats [JJ/MM/AAAA]
+      const contientEtiquette = (x) => x.texte.split("|").some((m) => K.ligneEtiquette && K.ligneEtiquette(m));
+      const suivantes = (x) => dessous(x, a.x0).filter((y) => !bruit(y));
+      for (;;) {
+        const suivante = suivantes(bas)[0];
+        if (!suivante || suivante.y0 - bas.y1 > bas.h * 1.6) break;
+        if (!suivante.types && !contientEtiquette(suivante) && !avecMotEtiquette(suivante)) break;
+        pile.push(suivante); bas = suivante;
+      }
+      pile.forEach((x) => prises.add(x.i));
+      const v = suivantes(bas)[0];
+      if (!v || v.types || prises.has(v.i) || v.y0 - bas.y1 > bas.h * 3.2) continue;
+      if (!/[A-Za-zÀ-ÿ0-9]/.test(v.texte) || v.texte.length > 80) continue;
+      prises.add(v.i);
+      // « Name | Vornamen » au-dessus de « EXEMPLE | Jean » : chaque morceau garde son type.
+      ajouter(v, a);
+    }
+    return sortie;
+  }
+  // Les adresses imprimées des administrations fédérales (3003 Berne : numéro postal réservé à l'administration fédérale)
+  // sont publiques : signalées, pas masquées d'office. Un toucher les masque si besoin.
+  const ADRESSE_ADMIN = /\b3003\s+Bern(e|a)?\b/i;
+
   function detect(p) {
     const terms = userTerms();
     const previous = new Map(p.boxes.map((b) => [b.ancre || b.key + "@" + b.x + "," + b.y, b.active]));
     p.boxes = [];
+    const auDessus = valeursAuDessus(p);
+    p.lines.forEach((line, numeroLigne) => { line.numero = numeroLigne; });
     for (const line of p.lines) {
       const words = line.words;
       if (!words.length) continue;
@@ -1703,6 +1774,7 @@
         const x1 = Math.max(...rects.map((r) => r.x + r.w)), y1 = Math.max(...rects.map((r) => r.y + r.h));
         const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, rects, key, token: tokenFor(key, type, value), words: idx.map((i) => words[i]), active: true, flag, source };
         box.ancre = key + "@" + box.x + "," + box.y; // reste la même si le nom complet agrandit la zone
+        if (type === "ADRESSE" && ADRESSE_ADMIN.test(raw)) { box.active = false; box.flag = "à relire"; box.source = "adresse publique de l'administration fédérale (3003 Berne) : signalée, pas masquée"; }
         const was = previous.get(box.ancre);
         if (was === false) box.active = false;
         p.boxes.push(box);
@@ -1716,6 +1788,11 @@
           if (isWordChar(nrm[k - 1]) || isWordChar(nrm[k + needle.length])) continue;
           take(nr, k, k + needle.length, t.type, t.value, t.key, null, t.origine);
         }
+      }
+      // Les valeurs écrites sous une étiquette (formulaires officiels).
+      for (const v of auDessus.get(line.numero) || []) {
+        const cle = v.type + "|" + (/\d/.test(v.valeur) ? v.valeur.replace(/[\s.]/g, "").toLowerCase() : norm(v.valeur));
+        take(rr, v.debut, v.fin, v.type, v.valeur, cle, null, `l'étiquette au-dessus « ${v.etiquette} »`);
       }
       for (const r of rules().concat(S.extra)) {
         r.re.lastIndex = 0;
@@ -1873,11 +1950,24 @@
     S.appris = S.appris || [];
     const vus = new Set(S.appris.map((t) => t.key));
     let nouveau = false;
+    for (const p of S.pages) for (const [, morceaux] of valeursAuDessus(p)) for (const m of morceaux) {
+      if (!TYPES_APPRIS.includes(m.type) || /\d{3,}/.test(m.valeur) && m.type === "PERSONNE" || !K.motsACherche(m.valeur).length) continue;
+      if (m.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w))) continue;
+      if (m.type === "PERSONNE" && !m.valeur.split(/\s+/).every((w) => /^[A-ZÀ-ÖØ-Ý]/.test(w))) continue;
+      if (m.type === "ADRESSE" && !/\d/.test(m.valeur)) continue; // une adresse a un numéro (rue ou code postal)
+      if (m.type === "ADRESSE" && ADRESSE_ADMIN.test(m.valeur)) continue;
+      const key = m.type + "|" + norm(m.valeur);
+      if (vus.has(key)) continue;
+      vus.add(key); S.appris.push({ type: m.type, value: m.valeur, key, appris: true }); nouveau = true;
+    }
     for (const p of S.pages) for (const l of p.lines || []) {
       const raw = l.words.map((w) => w.text).join(" ");
       for (const v of K.valeursApresEtiquettes(raw)) {
         const type = v.etiquette.type;
         if (!TYPES_APPRIS.includes(type) || /\d{3,}/.test(v.valeur) && type === "PERSONNE") continue;
+        if (K.estMotEtiquette && v.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w))) continue;
+        if (type === "PERSONNE" && !v.valeur.split(/\s+/).filter(Boolean).every((w) => /^[A-ZÀ-ÖØ-Ý(]/.test(w))) continue;
+        if (type === "ADRESSE" && !/\d/.test(v.valeur)) continue;
         if (!K.motsACherche(v.valeur).length) continue;
         const key = type + "|" + norm(v.valeur);
         if (vus.has(key)) continue;
@@ -3090,7 +3180,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.2";
+  const VERSION_APP = "0.8.3";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";

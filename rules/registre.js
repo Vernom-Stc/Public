@@ -49,12 +49,77 @@
       var suivante = trouves.slice(k + 1).find(function (x) { return x.debutEtiquette >= t.debut; });
       var fin = suivante ? suivante.debutEtiquette : ligne.length;
       var valeur = ligne.slice(t.debut, fin).replace(/[\s,;]+$/, "");
+      // Une étiquette n'avale jamais une autre étiquette ni une indication de format (« | Heure de naissance », « (jour-mois-année) »).
+      if (/^[|(\/;\[]/.test(valeur) || (K.ligneEtiquette && K.ligneEtiquette(valeur))) valeur = "";
       if (t.etiquette.valeurNom) {
         var nom = valeur.match(/^(?:[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+(?:\s+|$)){1,4}/);
         valeur = nom ? nom[0].trim() : "";
       }
       return { etiquette: t.etiquette, debut: t.debut, fin: t.debut + valeur.length, valeur: valeur };
     }).filter(function (v) { return /[A-Za-zÀ-ÿ0-9]/.test(v.valeur); });
+  };
+  /* ---- Étiquettes au-dessus de la valeur (voir rules/etiquettes.js : ajouterVocabulaire) ---- */
+  K.vocabulaire = K.vocabulaire || [];
+  var LIAISON = {};
+  ("de du des la le les l d di del della dello dei da dal dals of the and und et e ed ou oder o resp a au alla zum zur der den dem al il in " +
+   "en if applicable where le cas echeant falls zutreffend se del caso jour mois annee tag monat jahr day month year giorno mese anno " +
+   "jj mm aaaa tt jjjj gg an usuel usuels anterieur anterieurs demandeur demanderesse applicant applicants cas echeant ment " +
+   "l'inscripziun l'extract dell'atto dell'estratto l'acte l'extrait").split(" ").forEach(function (m) { LIAISON[m] = true; });
+  K.ajouterVocabulaire = function (parType) {
+    Object.keys(parType).forEach(function (type) {
+      parType[type].forEach(function (phrase) { K.vocabulaire.push({ type: type, mots: sansAccent(phrase).split(/[\s]+/).filter(Boolean) }); });
+    });
+    K.vocabulaire.sort(function (a, b) { return b.mots.length - a.mots.length; });
+  };
+  var motsLigne = function (t) {
+    return sansAccent(t).replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/\([^)]*$|^[^(]*?\)/g, " ").replace(/[()]/g, " ").replace(/-(\s|$)/g, "$1").replace(/[☐□*:;,"“”«»]/g, " ").replace(/(^|\s)[\d.\-]+(?=\s|$)/g, " ")
+      .split(/[\s\/]+/).map(function (m) { return m.replace(/^[^a-z0-9°]+|[^a-z0-9°.)]+$/g, ""); }).filter(Boolean);
+  };
+  // Erreur de lecture tolérée sur les longs mots d'étiquette (« naschientsche » pour « naschientscha ») : une lettre au plus.
+  function motProche(lu, attendu) {
+    if (lu === attendu) return true;
+    if (attendu.length < 7 || Math.abs(lu.length - attendu.length) > 1) return false;
+    var a = lu, b = attendu, i = 0, j = 0, diff = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++diff > 1) return false;
+      if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+    return diff + (a.length - i) + (b.length - j) <= 1;
+  }
+  // Une partie de ligne (entre deux « | ») faite seulement d'étiquettes : renvoie le type de la première, sinon null.
+  function partieEtiquette(texte) {
+    var mots = motsLigne(texte); if (!mots.length) return null;
+    var type = null, reste = 0, i = 0;
+    while (i < mots.length) {
+      var trouve = null;
+      for (var k = 0; k < K.vocabulaire.length && !trouve; k++) {
+        var v = K.vocabulaire[k], ok = v.mots.length && i + v.mots.length <= mots.length;
+        for (var j = 0; ok && j < v.mots.length; j++) if (!motProche(mots[i + j], v.mots[j])) ok = false;
+        if (ok) trouve = v;
+      }
+      if (trouve) { if (!type) type = trouve.type; i += trouve.mots.length; }
+      else { if (!LIAISON[mots[i]]) reste++; i++; }
+    }
+    return type && reste === 0 ? type : null;
+  }
+  // Un mot qui fait partie du vocabulaire des étiquettes (« Prénoms », « Cognome ») : jamais appris comme un nom.
+  // Une ligne sans aucun mot (formats « [JJ/MM/AAAA] », traits, cases) : ni étiquette, ni valeur.
+  K.ligneVide = function (t) { return motsLigne(t).length === 0; };
+  K.estMotEtiquette = function (mot) {
+    var m = motsLigne(mot)[0]; if (!m) return false;
+    return K.vocabulaire.some(function (v) { return v.mots.indexOf(m) >= 0 && v.mots.length <= 3; });
+  };
+  // Une ligne faite seulement d'étiquettes (« Name | Vornamen », « Nom / Name / Cognome / Num ») : les types, partie par partie.
+  K.ligneEtiquette = function (texte) {
+    var parties = String(texte).split("|");
+    var types = parties.map(partieEtiquette);
+    return types.every(function (t) { return !!t; }) ? types : null;
+  };
+  K.exemplesLigneEtiquette = {
+    oui: ["Data da naschientsche", "Name", "Nom de célibataire | Autres noms", "7 Nom / Name / Cognome / Num", "Geburtsdatum | Geburtszeit", "1. Surname (Family name) / Nom (nom de famille)",
+          "Data da naschientscha | Uras da la naschientscha", "Date of birth (day-month-year) / Date de naissance (jour-mois-année)"],
+    non: ["EXEMPLE", "EXEMPLE | Jean", "Exempleville", "Kind - Enfant - Figlio/a - Uffant", "01.01.2020 | 10:15", "Léa Marie", "Office de l'état civil d'Exempleville"]
   };
   K.ajouterCerbere = function (c) {
     K.cerbere.regles.push.apply(K.cerbere.regles, c.regles || []);

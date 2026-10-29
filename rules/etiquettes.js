@@ -49,7 +49,7 @@ Kerckhoffs.ajouterEtiquettes([
   {
     id: "numero",
     type: "NUMERO",
-    mots: ["n° d'assuré", "no d'assuré", "numéro d'assuré", "n° avs", "n° de dossier", "no de dossier", "n° patient",
+    mots: ["ref-nr", "ref.-nr.", "n° d'assuré", "no d'assuré", "numéro d'assuré", "n° avs", "n° de dossier", "no de dossier", "n° patient",
            "numéro de patient", "n° de police", "n° client", "n° de contribuable", "versichertennummer"],
     exemples: { trouve: [["N° de dossier : 2026-4471", "2026-4471"]], ignore: [] }
   },
@@ -66,3 +66,60 @@ Kerckhoffs.ajouterEtiquettes([
     exemples: { trouve: [["Médecin traitant : Dr Paul Exemple", "Dr Paul Exemple"]], ignore: ["le médecin a dit"] }
   }
 ]);
+
+/*
+ * Vocabulaire des formulaires officiels : étiquettes écrites AU-DESSUS de la valeur.
+ *
+ * Dans beaucoup de formulaires (actes d'état civil, demandes de visa, formulaires CIEC), l'étiquette est sur sa
+ * propre ligne, parfois empilée en plusieurs langues, et la valeur est écrite dessous, dans la même colonne.
+ * Une ligne faite uniquement de ces étiquettes est reconnue comme une étiquette ; la ligne juste dessous est masquée.
+ * Relevé dans des formulaires publics suisses (bj.admin.ch, sem.admin.ch, ar.admin.ch) : de, fr, it, rm, en.
+ * Les titres de section (« Parents », « Enfant »…) n'y sont volontairement pas : ce ne sont pas des étiquettes de valeur.
+ */
+Kerckhoffs.ajouterVocabulaire({
+  PERSONNE: [
+    "name", "vorname", "vornamen", "nachname", "familienname", "ledigname", "geburtsname", "andere amtliche namen",
+    "name zum zeitpunkt der ausstellung des auszugs", "name vor der eheschliessung", "sonstiger namensbestandteil", "sonstige namensbestandteile",
+    "nom", "noms", "prenom", "prenoms", "prenom(s)", "nom de famille", "nom de celibataire", "nom de naissance", "autres noms",
+    "nom avant le mariage", "nom au moment de la delivrance de l'acte", "autre partie du nom", "autres parties du nom", "nom et prenom",
+    "cognome", "nome", "nomi", "cognome da nubile/celibe", "cognome da nubile", "celibe", "cognome alla nascita", "altri nomi ufficiali",
+    "cognome prima del matrimonio", "cognome al momento del rilascio dell'estratto", "altra parte del cognome", "altre parti del cognome",
+    "surname", "family name", "first name", "first names", "given name", "given names", "surname at birth", "former family name",
+    "former family names", "full name",
+    "num", "prenums", "num da nubil", "num da nubila resp. nubil", "auters nums uffizials", "num avant la maridaglia",
+    "auter element dal num", "auters elements dal num",
+    "zivilstandsbeamtin", "zivilstandsbeamter", "zivilstandsbeamtin/zivilstandsbeamter", "nom de l'officier de l'etat civil",
+    "cognome dell'ufficiale dello stato civile", "num da la funcziunaria", "num dal funcziunari da stadi civil", "funcziunari da stadi civil", "unterschrift", "signature", "firma", "suttascripziun"
+  ],
+  NAISSANCE: [
+    "geburtsdatum", "geburtszeit", "date de naissance", "heure de naissance", "data di nascita", "ora di nascita",
+    "date of birth", "data da naschientscha", "uras da la naschientscha"
+  ],
+  LIEU: [
+    "geburtsort", "lieu de naissance", "luogo di nascita", "place of birth", "lieu da naschientscha", "heimatort", "heimatorte",
+    "lieu d'origine", "luogo di attinenza", "ort der eheschliessung", "lieu du mariage", "luogo del matrimonio", "lieu da la maridaglia"
+  ],
+  DATE: [
+    "datum", "date", "data", "datum der eheschliessung", "date du mariage", "data del matrimonio", "data da la maridaglia", "date de delivrance",
+    "datum der ausstellung", "data di rilascio", "data da la emissiun"
+  ],
+  ADRESSE: [
+    "adresse", "wohnadresse", "zustelladresse", "rechnungsadresse", "adresse du domicile", "adresse et localite", "indirizzo",
+    "indirizzo del domicilio", "home address", "address", "domicile", "wohnort"
+  ],
+  NUMERO: [
+    "ref-nr", "nr. des eintrags", "nr. des auszugs", "n° de l'acte", "n° de l'extrait", "n. dell'atto", "n. dell'estratto",
+    "nr. da l'inscripziun", "nr. da l'extract", "numero personnel d'identification", "personenkennzeichen", "numero personale d'identificazione",
+    "identificatur persunal", "no avs", "ahv-nr", "n. avs", "national identity number", "numero national d'identite",
+    "numero di identita nazionale", "number of travel document", "numero du document de voyage", "numero del documento di viaggio",
+    "nummer des reisedokuments", "passnummer", "number of travel docu", "numero du document de voyage"
+  ],
+  // Autres données personnelles des formulaires (sexe, état civil, nationalité) : la valeur est masquée.
+  DONNEE: [
+    "sexe", "geschlecht", "sesso", "schlattaina", "sex", "etat civil", "zivilstand", "stato civile", "civil status",
+    "nationalite", "nationalites", "nationalite(s)", "staatsangehorigkeit", "nazionalita", "nationality", "current nationality",
+    "avez-vous des enfants ?", "avez-vous des enfants", "profession", "beruf", "professione", "occupation", "current occupation"
+  ],
+  TEL: ["telefon", "telefonnummer", "telephone", "numero de telephone", "no de telephone", "numero di telefono", "telephone no", "natel"],
+  EMAIL: ["e-mail", "e-mail-adresse", "email", "adresse email", "adresse electronique", "indirizzo di posta elettronica", "e-mail address"]
+});

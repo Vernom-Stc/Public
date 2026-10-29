@@ -35,6 +35,18 @@ Cette version ne changera plus jamais toute seule, avec ou sans internet, tant q
 
 Une limite, dite franchement : sur le web, c'est le navigateur qui a le dernier mot sur les mises à jour. Pour les usages sensibles (avocats, médecins, administrations), utilisez donc la **version figée** : un seul fichier signé, à télécharger depuis l'accueil, qui s'ouvre d'un double-clic, fonctionne sans internet et ne se met jamais à jour tout seul.
 
+### Test 4 : qui est l'auteur de Kerckhoffs ?
+
+Kerckhoffs n'a pas de visage, et c'est voulu. Son auteur se reconnaît à une seule chose : il est le seul à pouvoir signer avec le sceau de Kerckhoffs.
+
+Si quelqu'un prétend être l'auteur, mettez-le au défi :
+
+1. Choisissez une phrase, avec la date du jour, par exemple « Kerckhoffs, 3 novembre 2026, pomme verte ».
+2. Demandez-lui de vous la rendre signée avec le sceau.
+3. Collez le message signé dans Kerckhoffs, à « Vérifier un message de l'auteur ».
+
+Si la signature est valide, c'est lui. Sinon, ce n'est pas l'auteur, quoi qu'il dise. Comme c'est vous qui choisissez la phrase et la date, personne ne peut ressortir une ancienne signature trouvée ailleurs. Ce défi prouve qui détient le sceau, sans rien révéler de l'identité de l'auteur. Si le sceau change un jour, le changement est annoncé par un message signé avec l'ancien sceau, et le défi continue avec le nouveau.
+
 ## Ce qui sort de votre téléphone, et ce qui n'en sort pas
 
 | | Quitte votre téléphone ? |

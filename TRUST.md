@@ -35,6 +35,18 @@ From then on, that version never changes by itself, online or offline, until you
 
 One honest limit: on the web, the browser has the last word on updates. For sensitive use (lawyers, doctors, public services), use the **frozen version**: one signed file, downloadable from the home screen, that opens with a double-click, works offline and never updates itself.
 
+### Test 4: who is the author of Kerckhoffs?
+
+Kerckhoffs has no face, on purpose. Its author is recognised by one thing only: they are the only one who can sign with the Kerckhoffs seal.
+
+If someone claims to be the author, challenge them:
+
+1. Pick a sentence that includes today's date, for example "Kerckhoffs, 3 November 2026, green apple".
+2. Ask them to send it back signed with the seal.
+3. Paste the signed message into Kerckhoffs, under "Vérifier un message de l'auteur" (check a message from the author).
+
+If the signature is valid, it is them. If not, it is not the author, whatever they say. Because you choose the sentence and the date, nobody can replay an old signature found elsewhere. The challenge proves who holds the seal without revealing anything about the author's identity. If the seal ever changes, the change is announced in a message signed with the old seal, and the challenge carries on with the new one.
+
 ## What leaves your phone, and what doesn't
 
 | | Leaves your phone? |
