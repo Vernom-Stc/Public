@@ -94,7 +94,7 @@
   }
 
   function wipe() {
-    S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false;
+    S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false; S.renomme = new Map();
     S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true; $("zonesChip").hidden = true;
     S.balayage = []; S.appris = []; S.parSelection = new Set(); S.trouves = null; S.orange = null; if ($("trouves")) $("trouves").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
@@ -1536,9 +1536,34 @@
   function tokenFor(key, type, value) {
     if (!S.tokens.has(key)) {
       S.counters[type] = (S.counters[type] || 0) + 1;
-      S.tokens.set(key, { token: `[${type}_${S.counters[type]}]`, type, value });
+      // Une étiquette renommée par l'utilisateur garde son nouveau nom, même si la détection est refaite.
+      const propre = S.renomme && S.renomme.get(key);
+      S.tokens.set(key, { token: propre ? `[${propre}]` : `[${type}_${S.counters[type]}]`, type, value, key });
     }
     return S.tokens.get(key).token;
+  }
+
+  // Renommer une étiquette : NOM_1 devient le code choisi par l'utilisateur, sur toutes les pages d'un coup.
+  // Kerckhoffs ne garde rien : le renommage est oublié avec le document. La correspondance reste chez l'utilisateur.
+  function codeValide(brut) {
+    const code = String(brut || "").trim().toUpperCase().replace(/\s+/g, "_");
+    return /^[A-Z0-9][A-Z0-9_.\-\/]{0,23}$/.test(code) ? code : null;
+  }
+  function renommerEtiquette(ancien, brut) {
+    const code = codeValide(brut);
+    if (!code) return "Le code ne peut contenir que des lettres sans accent, des chiffres et _ . - / (24 signes au plus).";
+    const neuf = `[${code}]`;
+    if (neuf === ancien) return "";
+    if ([...S.tokens.values()].some((t) => t.token === neuf)) return "Ce code est déjà utilisé par une autre étiquette.";
+    const t = [...S.tokens.values()].find((x) => x.token === ancien);
+    if (!t) return "Étiquette introuvable.";
+    if (!S.renomme) S.renomme = new Map();
+    S.renomme.set(t.key, code);
+    t.token = neuf;
+    S.pages.forEach((p) => p.boxes.forEach((b) => { if (b.token === ancien) b.token = neuf; }));
+    changed(); render(); renderLegend();
+    setStatus(`${ancien} s'appelle maintenant ${neuf}, sur toutes les pages.`);
+    return "";
   }
 
   function detect(p) {
@@ -1696,9 +1721,39 @@
   function renderLegend() {
     const used = new Set();
     S.pages.forEach((p) => p.boxes.forEach((b) => { if (b.active) used.add(b.token); }));
-    const rows = [...S.tokens.values()].filter((t) => used.has(t.token)).map((t) => `${t.token} = ${t.value}`);
-    $("legend").hidden = !rows.length || !$("optMask").checked;
-    $("legend").textContent = rows.length ? "Légende (affichée ici seulement, jamais exportée)\n" + rows.join("\n") : "";
+    const rows = [...S.tokens.values()].filter((t) => used.has(t.token));
+    const L = $("legend");
+    L.hidden = !rows.length || !$("optMask").checked;
+    L.textContent = "";
+    if (!rows.length) return;
+    const titre = document.createElement("p"); titre.className = "legend-titre";
+    titre.textContent = "Légende (affichée ici seulement, jamais exportée)";
+    L.append(titre);
+    rows.forEach((t) => {
+      const ligne = document.createElement("div"); ligne.className = "legend-ligne";
+      const txt = document.createElement("span"); txt.textContent = `${t.token} = ${t.value}`;
+      const bouton = document.createElement("button"); bouton.type = "button"; bouton.className = "btn small";
+      bouton.textContent = "Renommer";
+      bouton.addEventListener("click", () => {
+        ligne.textContent = "";
+        const champ = document.createElement("input"); champ.type = "text"; champ.maxLength = 24;
+        champ.placeholder = "votre code, ex. P-2026-118"; champ.autocapitalize = "characters"; champ.spellcheck = false;
+        champ.setAttribute("aria-label", `Nouveau nom pour ${t.token}`);
+        const ok = document.createElement("button"); ok.type = "button"; ok.className = "btn small primary"; ok.textContent = "OK";
+        const non = document.createElement("button"); non.type = "button"; non.className = "btn small"; non.textContent = "✕";
+        non.setAttribute("aria-label", "Annuler");
+        const aide = document.createElement("p"); aide.className = "hint";
+        aide.textContent = `Remplace ${t.token} sur toutes les pages. N'écrivez jamais le vrai nom : ce code partira avec le document.`;
+        const valider = () => { const err = renommerEtiquette(t.token, champ.value); if (err) aide.textContent = err; };
+        ok.addEventListener("click", valider);
+        non.addEventListener("click", renderLegend);
+        champ.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); valider(); } else if (e.key === "Escape") { e.preventDefault(); renderLegend(); } });
+        ligne.append(champ, ok, non, aide);
+        champ.focus();
+      });
+      ligne.append(txt, bouton);
+      L.append(ligne);
+    });
   }
   $("optMask").addEventListener("change", () => { changed(); renderLegend(); });
 
@@ -1924,9 +1979,13 @@
   let profilLu = null;           // profil déchiffré, en attente de confirmation
 
   const liste = (id) => $(id).value.split(",").map((s) => s.trim()).filter(Boolean);
+  // Format des QR codes de préférences. RÈGLE : une nouvelle version de Kerckhoffs doit toujours savoir lire
+  // les QR codes des versions précédentes. On n'enlève jamais un format : si FORMAT_PROFIL augmente,
+  // validerProfil continue d'accepter les anciens et complète ce qui leur manque.
+  const FORMAT_PROFIL = 1;
   function profilActuel() {
     return {
-      v: 1,
+      v: FORMAT_PROFIL,
       noms: liste("tNames"), adresses: liste("tAddr"), autres: liste("tOther"),
       formes: S.extra.filter((r) => r.forme).map((r) => r.forme),
       numeros: S.extra.filter((r) => r.numero).map((r) => r.numero),
@@ -1940,7 +1999,7 @@
   // Contrôle strict : tout ce qui ne correspond pas exactement au format attendu est refusé.
   const FORME_OK = /^[A-Za-zÀ-ÿ0-9 .\-\/:'’]{2,40}$/;
   function validerProfil(o) {
-    if (!o || typeof o !== "object" || Array.isArray(o) || o.v !== 1) return null;
+    if (!o || typeof o !== "object" || Array.isArray(o) || !Number.isInteger(o.v) || o.v < 1 || o.v > FORMAT_PROFIL) return null;
     const cles = ["v", "noms", "adresses", "autres", "formes", "numeros", "zones", "dates"];
     o.numeros = o.numeros || []; o.zones = o.zones || []; // profils plus anciens
     if (Object.keys(o).some((k) => !cles.includes(k))) return null;
@@ -2556,14 +2615,15 @@
   }
 
   // Remove Before Flight, niveau Strict (par défaut) : chaque point doit être traité, dernière relecture automatique,
-  // puis un aperçu final. Niveau Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier.
+  // puis l'aperçu final. Niveau Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier.
+  // Dans les deux niveaux, rien ne part sans l'aperçu final et la case d'autorisation cochée.
   let strict = true;
   try { strict = localStorage.getItem("kerckhoffs-strict") !== "0"; } catch (e) {}
   function majNiveau() {
     $("niveauStrict").checked = strict; $("niveauNormal").checked = !strict; $("optStrict").checked = strict;
     $("niveauNote").textContent = strict
-      ? "Strict : chaque point doit être traité, Kerckhoffs fait une dernière relecture, puis un aperçu s'affiche avant l'envoi."
-      : "Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier, et la mention reste toujours en bas du document.";
+      ? "Strict : chaque point vous est soumis (laisser ou masquer), Kerckhoffs fait une dernière relecture, puis l'aperçu final s'affiche avant l'envoi."
+      : "Normal : la liste ne s'affiche que s'il reste quelque chose à vérifier, et la mention reste toujours en bas du document. L'aperçu final s'affiche aussi avant chaque envoi.";
     $("optMention").disabled = !strict;
     if (!strict) $("optMention").checked = true;
   }
@@ -2616,7 +2676,7 @@
   async function avecCerbere(action, sansEnvoi) {
     cerbereSansEnvoi = !!sansEnvoi; balayageInfo = "";
     // Sans masquage, ou document déjà validé et inchangé : on envoie tout de suite, sans contrôle ni animation.
-    if (!$("optMask").checked || (cerbereOk === S.version && !strict)) return action();
+    if (!$("optMask").checked || (cerbereOk === S.version && !strict)) { if (cerbereSansEnvoi) return action(); ouvrirApercu(action); return; }
     let attendu = false;
     if (busy) { // lecture en cours : on attend qu'elle finisse, puis Cerbère vérifie
       attendu = true;
@@ -2638,9 +2698,8 @@
     if (!items.length && direct && !strict) {
       cerbereOk = S.version; render();
       if (sansEnvoi) { await action(); return; }
-      if (animationPossible()) { apresValidation(action); return; }
-      await action();
-      setStatus(($("status").textContent + " Remove Before Flight : rien à signaler, bon vol.").trim());
+      setStatus("Remove Before Flight : rien à signaler, bon vol.");
+      apresValidation(action);
       return;
     }
     cerbereItems = items; cerbereSuite = action;
@@ -2674,11 +2733,15 @@
 
   // Après la validation : l'animation, puis un bouton « Envoyer » (le menu de partage du téléphone exige un toucher).
   let envolSuite = null;
+  // Après la validation : toujours l'aperçu final, avec la case « J'ai vérifié, et je donne mon autorisation pour envoyer ».
+  // Puis l'animation, et un bouton « Envoyer » (le menu de partage du téléphone exige un toucher).
   function apresValidation(suite) {
     if (!suite) return;
-    if (!animationPossible()) { if (strict) ouvrirApercu(suite); else suite(); return; }
+    ouvrirApercu(suite);
+  }
+  function envoyerApresApercu(suite) {
+    if (!animationPossible()) { suite(); return; }
     jouerEnvol().then(() => {
-      if (strict) { fermerEnvol(); ouvrirApercu(suite); return; }
       envolSuite = suite;
       const sansPartage = suite === doShare && fmt() !== "text" && !partageFichiers();
       $("envolEnvoyer").textContent = suite === doCopy ? "Copier" : suite === doSave || sansPartage ? "Enregistrer" : "Envoyer";
@@ -2783,7 +2846,12 @@
     const box = $("apercuPages");
     box.textContent = "";
     const masked = $("optMask").checked, f = fmt();
-    S.pages.forEach((p) => {
+    if (f === "text") {
+      // Envoi en texte : l'aperçu montre le texte exact qui partira.
+      const pre = document.createElement("pre"); pre.className = "apercu-texte"; pre.textContent = "…"; box.append(pre);
+      buildText(masked).then((t) => { pre.textContent = masked && avecMention() ? t + "\n\n— " + texteMention() : t; })
+        .catch(() => { pre.textContent = "L'aperçu du texte a échoué. Revenez et réessayez."; });
+    } else S.pages.forEach((p) => {
       let c = finalCanvas(p, masked);
       if (f === "light") c = lighten(c);
       c = avecBande(c, masked);
@@ -2794,6 +2862,7 @@
     });
     $("apercuOk").checked = false;
     $("apercuSend").disabled = true;
+    $("apercuSend").textContent = animationPossible() ? "Valider" : suite === doCopy ? "Copier" : suite === doSave ? "Enregistrer" : "Envoyer";
     $("apercu").hidden = false;
   }
   $("apercuOk").addEventListener("change", () => { $("apercuSend").disabled = !$("apercuOk").checked; });
@@ -2801,7 +2870,7 @@
   $("apercuSend").addEventListener("click", () => {
     $("apercu").hidden = true;
     const suite = apercuSuite; apercuSuite = null;
-    if (suite) suite();
+    if (suite) envoyerApresApercu(suite);
   });
   $("btnCerbere").addEventListener("click", () => { cerbereOk = -1; closeSheet(); avecCerbere(() => setStatus("Remove Before Flight : rien d'autre à signaler."), true); });
 
@@ -2852,7 +2921,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.0";
+  const VERSION_APP = "0.8.1";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";

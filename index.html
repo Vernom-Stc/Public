@@ -55,9 +55,9 @@
     <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page. Ouvrez-la dans votre navigateur, pas depuis une autre application.</p>
     <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
     <p class="home-links"><button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button></p>
-    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.8.0.html" download>Version figée, pour les usages sensibles</a></p>
+    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.8.1.html" download>Version figée, pour les usages sensibles</a></p>
   </details>
-  <p class="fineprint">Version 0.8.0 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.8.1 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : la feuille en plein écran, quatre boutons aux quatre coins ============ -->
@@ -251,7 +251,7 @@
 
     <button class="btn" id="back" type="button">Fermer le document et revenir à l'accueil</button>
     <p class="status" id="status" role="status"></p>
-    <p class="legend" id="legend" hidden></p>
+    <div class="legend" id="legend" hidden></div>
   </section>
 
   <!-- Cerbère : le rapport avant envoi -->
@@ -342,13 +342,13 @@
   </div>
 </section>
 
-<!-- Aperçu final (mode strict) -->
+<!-- Aperçu final : à chaque envoi, dans les deux niveaux -->
 <section class="overlay" id="apercu" hidden aria-label="Aperçu final">
   <div class="overlay-inner">
     <h3>Aperçu final</h3>
     <p class="hint">Voici exactement ce qui va partir. Vérifiez chaque page.</p>
     <div class="apercu-pages" id="apercuPages"></div>
-    <label class="check"><input type="checkbox" id="apercuOk"> J'ai vérifié tout le document</label>
+    <label class="check"><input type="checkbox" id="apercuOk"> J'ai vérifié, et je donne mon autorisation pour envoyer</label>
     <div class="cerbere-foot">
       <button class="btn" id="apercuBack" type="button">Revenir</button>
       <button class="btn primary" id="apercuSend" type="button" disabled>Envoyer</button>

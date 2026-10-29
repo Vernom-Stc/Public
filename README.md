@@ -42,7 +42,7 @@ La détection automatique peut rater un élément, surtout sur une photo floue o
 
 ## Utiliser Kerckhoffs
 
-Ouvrez l'adresse officielle de Kerckhoffs, **kerckhoffs.app**, sur votre téléphone. Le code est publié sur Codeberg, une association à but non lucratif basée à Berlin : codeberg.org/kerckhoffs-1883/kerckhoffs. Une fois la page chargée, elle reste disponible hors ligne. Vous pouvez l'ajouter à votre écran d'accueil (« Ajouter à l'écran d'accueil » dans le menu du navigateur).
+Ouvrez l'adresse officielle de Kerckhoffs, **kerckhoffs.app**, sur votre téléphone. Le code est public : l'adresse du dépôt officiel est indiquée sur kerckhoffs.app. Une fois la page chargée, elle reste disponible hors ligne. Vous pouvez l'ajouter à votre écran d'accueil (« Ajouter à l'écran d'accueil » dans le menu du navigateur).
 
 Pour la lancer sur votre ordinateur :
 

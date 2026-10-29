@@ -427,3 +427,13 @@ details.group:not([open]){gap:0}
 }
 .pile-boutons{flex-wrap:wrap;justify-content:flex-end}
 .style-chip{padding:3px 10px;font-size:.74rem;opacity:.92}
+
+/* Aperçu final en texte */
+.apercu-texte{white-space:pre-wrap;font:.85rem/1.45 var(--mono);color:var(--ink);max-height:55vh;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:.8rem;margin:0}
+
+/* Légende : renommer une étiquette */
+.legend-titre{margin:0 0 .4rem}
+.legend-ligne{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:.25rem 0}
+.legend-ligne span{flex:1 1 12rem;min-width:0;word-break:break-word}
+.legend-ligne input{flex:1 1 10rem;min-width:0;font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:.35rem .5rem}
+.legend-ligne .hint{flex-basis:100%;margin:.1rem 0 0}

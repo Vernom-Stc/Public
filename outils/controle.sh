@@ -19,7 +19,7 @@ ko() { echo "REFUS : $1"; echec=1; }
 # 1. Aucun appel réseau dans le code propre à Kerckhoffs.
 files="app.js verification.js rules/registre.js rules/commun.js rules/pays/*.js index.html"
 # Seule exception : les deux liens officiels de app.js, à ouvrir dans le navigateur (jamais une connexion de l'application).
-autorises='^app.js:[0-9]+:  const (ADRESSE_OFFICIELLE = "https://kerckhoffs.app/"|PAGE_VERSIONS = "https://codeberg.org/kerckhoffs-1883/kerckhoffs/src/branch/main/VERSIONS.md");$'
+autorises='^app.js:[0-9]+:  const (ADRESSE_OFFICIELLE = "https://kerckhoffs.app/"|PAGE_VERSIONS = "https://kerckhoffs.app/VERSIONS.md");$'
 if grep -nE "fetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|RTCPeerConnection|importScripts|https?://" $files | grep -vE "$autorises"; then
   ko "un accès réseau ou une adresse externe a été ajouté. Kerckhoffs ne doit jamais se connecter à internet."
 fi
@@ -29,6 +29,9 @@ grep -nE "https?://" sw.js && ko "sw.js ne doit contenir aucune adresse externe.
 grep -q "connect-src 'self'" index.html || ko "la règle connect-src 'self' a été retirée de index.html."
 grep -q "url.origin !== self.location.origin" sw.js || ko "le blocage des requêtes externes a été retiré de sw.js."
 grep -q "Mise à jour non demandée" sw.js || ko "sw.js doit refuser toute mise à jour que la personne n'est pas allée chercher."
+
+grep -q "o.v < 1 || o.v > FORMAT_PROFIL" app.js || ko "les QR codes des versions précédentes ne seraient plus lus (règle FORMAT_PROFIL)."
+grep -q 'id="apercuOk"' index.html || ko "la case d'autorisation avant envoi a été retirée."
 
 # 3. Chaque fichier correspond à la liste, et la liste est signée par l'auteur.
 sha256sum --quiet -c empreintes.txt || ko "un fichier ne correspond pas à empreintes.txt."
