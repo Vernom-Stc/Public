@@ -32,6 +32,15 @@ Kerckhoffs.ajouterCerbere({
     }
 ,
     {
+      // Prénoms courants (français, allemand, italien, espagnol, portugais, anglais), écrits « Marie » ou « MARIE ».
+      // Jamais masqués d'office (« rue Victor Hugo ») : seulement proposés dans la liste de contrôle.
+      id: "prenom",
+      label: "Prénom possible",
+      type: "NOM",
+      re: /(?<![A-Za-zÀ-ÖØ-öø-ÿ])(?:Alessandra|Alessandro|Christophe|Maximilian|Alejandro|Alexandre|Catherine|Christine|Elizabeth|Francesca|Francesco|Katharina|Sébastien|Véronique|Caroline|Fernando|Frédéric|Giovanni|Giuseppe|Isabelle|Jennifer|Nathalie|Patricia|Philippe|Sandrine|Stefanie|Stéphane|Andreas|Antoine|Antonio|Aurélie|Beatriz|Camille|Charles|Claudia|Florian|Gabriel|Jacques|Jessica|Laurent|Lorenzo|Mariana|Martina|Mathieu|Michael|Nicolas|Olivier|Patrick|Raphaël|Richard|Roberto|Stefano|Valérie|Vincent|William|Andrea|Arthur|Audrey|Carlos|Carmen|Chiara|Claire|Céline|Daniel|Edward|George|Giulia|Hannah|Isabel|Javier|Joseph|Julien|Jürgen|Louise|Manuel|Markus|Martin|Matteo|Maxime|Michel|Miguel|Monika|Nathan|Olivia|Pascal|Pierre|Robert|Sabine|Sergio|Sophie|Stefan|Steven|Sylvie|Teresa|Thomas|Tobias|Ursula|Élodie|Émilie|Alain|Alice|Brian|Chloé|David|Diego|Elena|Emily|Felix|Henry|James|Jonas|Jules|Julia|Julie|Karen|Kevin|Klaus|Laura|Linda|Louis|Lucas|Lucie|Lucía|Luigi|Lukas|Manon|Marco|Maria|Marie|Mario|Nancy|Pablo|Paola|Pedro|Peter|Petra|Pilar|Sarah|Sofía|Susan|Adam|Anna|Anne|Emma|Enzo|Eric|Hans|Hugo|Inès|Inês|Jade|Jean|John|José|João|Juan|Lena|Lina|Lisa|Luca|Luis|Marc|Mark|Mary|Noah|Paul|Rosa|Ryan|Sara|Théo|Éric|Ana|Léa|Léo|Rui|Zoé|ALESSANDRA|ALESSANDRO|CHRISTOPHE|MAXIMILIAN|ALEJANDRO|ALEXANDRE|CATHERINE|CHRISTINE|ELIZABETH|FRANCESCA|FRANCESCO|KATHARINA|SÉBASTIEN|VÉRONIQUE|CAROLINE|FERNANDO|FRÉDÉRIC|GIOVANNI|GIUSEPPE|ISABELLE|JENNIFER|NATHALIE|PATRICIA|PHILIPPE|SANDRINE|STEFANIE|STÉPHANE|ANDREAS|ANTOINE|ANTONIO|AURÉLIE|BEATRIZ|CAMILLE|CHARLES|CLAUDIA|FLORIAN|GABRIEL|JACQUES|JESSICA|LAURENT|LORENZO|MARIANA|MARTINA|MATHIEU|MICHAEL|NICOLAS|OLIVIER|PATRICK|RAPHAËL|RICHARD|ROBERTO|STEFANO|VALÉRIE|VINCENT|WILLIAM|ANDREA|ARTHUR|AUDREY|CARLOS|CARMEN|CHIARA|CLAIRE|CÉLINE|DANIEL|EDWARD|GEORGE|GIULIA|HANNAH|ISABEL|JAVIER|JOSEPH|JULIEN|JÜRGEN|LOUISE|MANUEL|MARKUS|MARTIN|MATTEO|MAXIME|MICHEL|MIGUEL|MONIKA|NATHAN|OLIVIA|PASCAL|PIERRE|ROBERT|SABINE|SERGIO|SOPHIE|STEFAN|STEVEN|SYLVIE|TERESA|THOMAS|TOBIAS|URSULA|ÉLODIE|ÉMILIE|ALAIN|ALICE|BRIAN|CHLOÉ|DAVID|DIEGO|ELENA|EMILY|FELIX|HENRY|JAMES|JONAS|JULES|JULIA|JULIE|KAREN|KEVIN|KLAUS|LAURA|LINDA|LOUIS|LUCAS|LUCIE|LUCÍA|LUIGI|LUKAS|MANON|MARCO|MARIA|MARIE|MARIO|NANCY|PABLO|PAOLA|PEDRO|PETER|PETRA|PILAR|SARAH|SOFÍA|SUSAN|ADAM|ANNA|ANNE|EMMA|ENZO|ERIC|HANS|HUGO|INÈS|INÊS|JADE|JEAN|JOHN|JOSÉ|JOÃO|JUAN|LENA|LINA|LISA|LUCA|LUIS|MARC|MARK|MARY|NOAH|PAUL|ROSA|RYAN|SARA|THÉO|ÉRIC|ANA|LÉA|LÉO|RUI|ZOÉ)(?![A-Za-zÀ-ÖØ-öø-ÿ])/g,
+      exemples: { trouve: ["HUGO", "Marie", "Jürgen"], ignore: ["hugo", "Mariette", "Annecy", "PAULINE"] }
+    },
+    {
       // Code de référence mêlant lettres et chiffres (numéro de document, de dossier…), ex. « AKQ278MXN »
       id: "reference",
       label: "Référence possible (lettres et chiffres)",

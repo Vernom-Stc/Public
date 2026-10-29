@@ -49,6 +49,10 @@
       var suivante = trouves.slice(k + 1).find(function (x) { return x.debutEtiquette >= t.debut; });
       var fin = suivante ? suivante.debutEtiquette : ligne.length;
       var valeur = ligne.slice(t.debut, fin).replace(/[\s,;]+$/, "");
+      if (t.etiquette.valeurNom) {
+        var nom = valeur.match(/^(?:[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+(?:\s+|$)){1,4}/);
+        valeur = nom ? nom[0].trim() : "";
+      }
       return { etiquette: t.etiquette, debut: t.debut, fin: t.debut + valeur.length, valeur: valeur };
     }).filter(function (v) { return /[A-Za-zÀ-ÿ0-9]/.test(v.valeur); });
   };

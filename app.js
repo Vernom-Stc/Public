@@ -94,7 +94,7 @@
   }
 
   function wipe() {
-    S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false; S.renomme = new Map();
+    S.pages = []; S.cur = 0; S.tokens = new Map(); S.counters = {}; S.cache = null; S.leaving = false; S.renomme = new Map(); S.choisis = [];
     S.extra = []; S.zones = []; S.sel = null; $("selbar").hidden = true; $("zonesChip").hidden = true;
     S.balayage = []; S.appris = []; S.parSelection = new Set(); S.trouves = null; S.orange = null; if ($("trouves")) $("trouves").hidden = true;
     S.cadre = null; $("cropbar").hidden = true;
@@ -702,6 +702,114 @@
     return [...p.boxes].reverse().find((b) => (b.rects || [b]).some((r) => x >= r.x - t && x <= r.x + r.w + t && y >= r.y - t && y <= r.y + r.h + t));
   };
 
+  // Toucher une zone masquée ouvre la barre « C'est : un nom · une adresse · un numéro ou code · autre… ».
+  // Toucher une zone démasquée (pointillés) la masque de nouveau.
+  function hitEtiq(p, x, y) {
+    const t = 8 / S.view.s;
+    for (let i = p.strokes.length - 1; i >= 0; i--) {
+      const st = p.strokes[i];
+      if (st.etiq && st.etiq.rects.some((r) => x >= r.x - t && x <= r.x + r.w + t && y >= r.y - t && y <= r.y + r.h + t)) return st;
+    }
+    return null;
+  }
+  function toucherEtiquette(p, x, y) {
+    const st = hitEtiq(p, x, y);
+    if (st) { ouvrirEtiq({ page: p, stroke: st }); return true; }
+    const b = hitBox(p, x, y);
+    if (!b) return false;
+    if (b.active) ouvrirEtiq({ page: p, box: b });
+    else { toggleBox(p, b); afterEdit(); }
+    return true;
+  }
+  let etiqCible = null, etiqMode = null;
+  const etiqJeton = (c) => (c.box ? c.box.token : tokenFor(c.stroke.etiq.key, c.stroke.etiq.type, c.stroke.etiq.value));
+  const etiqValeur = (c) => String(c.box ? c.box.words.map((w) => w.text).join(" ") : c.stroke.etiq.value || "").replace(/^[\s,;:.()]+|[\s,;:.()]+$/g, "");
+  function ouvrirEtiq(c) {
+    etiqCible = c; etiqMode = null;
+    $("selbar").hidden = true; $("refbar").hidden = true;
+    $("etiqTitre").textContent = `${etiqJeton(c)} : c'est`;
+    $("etiqSaisie").hidden = true; $("etiqAide").hidden = true;
+    $("etiqbar").hidden = false;
+    setStatus(c.box && c.box.source ? `Masqué par ${c.box.source}. Choisissez ce que c'est, ou rendez-le visible.` : "Choisissez ce que c'est, ou rendez-le visible.", true);
+  }
+  function fermerEtiq() { etiqCible = null; etiqMode = null; $("etiqbar").hidden = true; }
+  function rectDeCible(c) {
+    if (c.box) return unionDe(c.box.rects || [c.box]);
+    return c.stroke.etiq.zone || unionDe(c.stroke.etiq.rects);
+  }
+  // Un nom collé à un nom déjà trouvé, sur la même ligne : il rejoint son étiquette.
+  function voisinPersonne(c) {
+    const r = rectDeCible(c), p = c.page;
+    const proche = (o) => {
+      const h = Math.min(r.h, o.h), recouvre = Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y);
+      const ecart = Math.max(o.x - (r.x + r.w), r.x - (o.x + o.w));
+      return recouvre >= h * 0.5 && ecart <= Math.max(r.h, o.h) * 1.5;
+    };
+    const b = p.boxes.find((x) => x !== c.box && x.active && String(x.key).startsWith("PERSONNE|") && proche(unionDe(x.rects || [x])));
+    if (b) return b.key;
+    const s = p.strokes.find((x) => x !== c.stroke && x.etiq && x.etiq.type === "PERSONNE" && proche(x.etiq.zone || unionDe(x.etiq.rects)));
+    return s ? s.etiq.key : null;
+  }
+  function choisirType(type, libelle) {
+    const c = etiqCible; if (!c) return;
+    const valeur = etiqValeur(c);
+    if (!valeur) { fermerEtiq(); return; }
+    let key = type + "|" + norm(valeur);
+    if (type === "PERSONNE") key = voisinPersonne(c) || key;
+    if (c.stroke) { c.stroke.etiq.type = type; c.stroke.etiq.key = key; c.stroke.etiq.value = valeur; }
+    S.choisis = (S.choisis || []).filter((t) => norm(t.value) !== norm(valeur));
+    S.choisis.push({ type, value: valeur, key, origine: `votre choix (« ${libelle} »)` });
+    fermerEtiq();
+    S.tokens = new Map(); S.counters = {};
+    S.pages.forEach((q) => { if (q.lines) detect(q); });
+    changed(); render(); renderLegend();
+    const jeton = tokenFor(key, type, valeur);
+    setStatus(`« ${valeur} » est maintenant ${jeton}, partout où il apparaît.`, true);
+  }
+  document.querySelectorAll("#etiqbar [data-etiq]").forEach((b) => b.addEventListener("click", () => choisirType(b.dataset.etiq, b.textContent)));
+  function ouvrirSaisie(mode) {
+    etiqMode = mode;
+    $("etiqSaisie").hidden = false; $("etiqAide").hidden = false;
+    $("etiqChamp").value = "";
+    $("etiqChamp").placeholder = mode === "autre" ? "ex. VOITURE" : "ex. P-2026-118";
+    $("etiqAide").textContent = mode === "autre"
+      ? "Écrivez le nom de l'étiquette (VOITURE, ENTREPRISE…). N'écrivez jamais la vraie donnée : ce mot partira avec le document."
+      : `Nouveau nom pour ${etiqJeton(etiqCible)}, sur toutes les pages. N'écrivez jamais le vrai nom : ce code partira avec le document.`;
+    $("etiqChamp").focus();
+  }
+  $("etiqAutre").addEventListener("click", () => ouvrirSaisie("autre"));
+  $("etiqRenommer").addEventListener("click", () => ouvrirSaisie("renommer"));
+  function validerSaisie() {
+    if (!etiqCible) return;
+    if (etiqMode === "autre") {
+      const code = codeValide($("etiqChamp").value);
+      if (!code) { $("etiqAide").textContent = "Lettres sans accent, chiffres et _ . - / seulement (24 signes au plus)."; return; }
+      choisirType(code, code.toLowerCase());
+    } else if (etiqMode === "renommer") {
+      const err = renommerEtiquette(etiqJeton(etiqCible), $("etiqChamp").value);
+      if (err) { $("etiqAide").textContent = err; return; }
+      fermerEtiq();
+    }
+  }
+  $("etiqOk").addEventListener("click", validerSaisie);
+  $("etiqChamp").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); validerSaisie(); }
+    else if (e.key === "Escape") { e.preventDefault(); fermerEtiq(); }
+  });
+  $("etiqVisible").addEventListener("click", () => {
+    const c = etiqCible; if (!c) return;
+    fermerEtiq();
+    if (c.box) toggleBox(c.page, c.box);
+    else {
+      const i = c.page.strokes.indexOf(c.stroke);
+      if (i >= 0) { c.page.strokes.splice(i, 1); history.push({ type: "remove", page: c.page, item: c.stroke, index: i }); }
+      setStatus("Rendu visible.", true);
+    }
+    afterEdit();
+  });
+  $("etiqCancel").addEventListener("click", fermerEtiq);
+  $("etiqbar").addEventListener("pointerdown", (e) => e.stopPropagation());
+
   function toggleBox(p, b) {
     b.active = !b.active; history.push({ type: "toggle", page: p, item: b });
     setStatus(b.active ? "Masqué de nouveau." : `Rendu visible. Il avait été masqué par ${b.source || "la détection"}. Touchez-le encore pour le masquer.`, true);
@@ -873,14 +981,13 @@
     if (d.kind === "erase") return;
     if (d.kind === "ajuster") { render(); return; } // la sélection reste, à sa nouvelle place
     if (d.kind === "pan") {
-      if (!moved && !d.force) { const hit = hitBox(p, d.pt[0], d.pt[1]); if (hit) { toggleBox(p, hit); afterEdit(); } }
+      if (!moved && !d.force) toucherEtiquette(p, d.pt[0], d.pt[1]);
       return;
     }
     if (!moved || (d.kind === "rect" && (d.w < 4 || d.h < 4))) {
       // Un simple toucher sur une zone détectée la masque ou la démasque.
       const [x, y] = d.kind === "line" ? d.pts[0] : [d.x0, d.y0];
-      const hit = hitBox(p, x, y);
-      if (hit) { toggleBox(p, hit); afterEdit(); return; }
+      if (toucherEtiquette(p, x, y)) return;
       if (d.kind === "rect") { render(); return; }
     }
     if (d.kind === "crop") {
@@ -1568,7 +1675,7 @@
 
   function detect(p) {
     const terms = userTerms();
-    const previous = new Map(p.boxes.map((b) => [b.key + "@" + b.x + "," + b.y, b.active]));
+    const previous = new Map(p.boxes.map((b) => [b.ancre || b.key + "@" + b.x + "," + b.y, b.active]));
     p.boxes = [];
     for (const line of p.lines) {
       const words = line.words;
@@ -1581,7 +1688,7 @@
         const n = norm(w.text);
         nr.push([nrm.length, nrm.length + n.length]); nrm += n;
       });
-      const used = new Set();
+      const used = new Set(), debutLigne = p.boxes.length;
       const take = (ranges, s, e, type, value, key, flag, source) => {
         const idx = [];
         ranges.forEach(([a, b], i) => { if (a < e && b > s) idx.push(i); });
@@ -1595,10 +1702,21 @@
         const x0 = Math.min(...rects.map((r) => r.x)), y0 = Math.min(...rects.map((r) => r.y));
         const x1 = Math.max(...rects.map((r) => r.x + r.w)), y1 = Math.max(...rects.map((r) => r.y + r.h));
         const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, rects, key, token: tokenFor(key, type, value), words: idx.map((i) => words[i]), active: true, flag, source };
-        const was = previous.get(key + "@" + box.x + "," + box.y);
+        box.ancre = key + "@" + box.x + "," + box.y; // reste la même si le nom complet agrandit la zone
+        const was = previous.get(box.ancre);
         if (was === false) box.active = false;
         p.boxes.push(box);
       };
+      // Vos choix d'abord (« C'est : un nom… » sur une étiquette) : ils passent avant toute autre règle.
+      for (const t of S.choisis || []) {
+        const needle = norm(t.value);
+        let from = 0, k;
+        while (needle && (k = nrm.indexOf(needle, from)) > -1) {
+          from = k + 1;
+          if (isWordChar(nrm[k - 1]) || isWordChar(nrm[k + needle.length])) continue;
+          take(nr, k, k + needle.length, t.type, t.value, t.key, null, t.origine);
+        }
+      }
       for (const r of rules().concat(S.extra)) {
         r.re.lastIndex = 0;
         let m;
@@ -1650,7 +1768,58 @@
           if (c) take(rr, rr[i][0], rr[i][1], t.type, liste ? c : t.value, liste ? t.type + "|" + norm(c) : t.key, null, t.origine + " (« " + c + " »)");
         });
       }
+      // Le nom complet : autour d'un nom trouvé, les mots voisins qui ressemblent à un prénom ou à un nom
+      // (majuscule au début, pas un mot courant, pas un mot repère) rejoignent la même étiquette.
+      // « Owner HUGO [PERSONNE_1] DOMINGUEZ » devient « Owner [PERSONNE_1] ».
+      p.boxes.slice(debutLigne).filter((b) => String(b.key).startsWith("PERSONNE|")).forEach((b) => {
+        const idx = b.words.map((w) => words.indexOf(w)).filter((i) => i >= 0);
+        if (!idx.length) return;
+        let g = Math.min(...idx), d = Math.max(...idx), ajout = 0;
+        // Même écriture que le nom trouvé : « HUGO » à côté de « EXEMPLE », « Hugo » à côté de « Exemple ».
+        const enCapitales = (t) => { const m = String(t).replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, ""); return m.length > 1 && m === m.toUpperCase(); };
+        const capitales = b.words.every((w) => enCapitales(w.text));
+        const voisin = (i) => i >= 0 && i < words.length && !used.has(i) && ressembleNom(words[i].text) && enCapitales(words[i].text) === capitales;
+        while (ajout < 4 && voisin(g - 1)) { g--; ajout++; agrandir(b, words[g], used, g); }
+        while (ajout < 4 && voisin(d + 1)) { d++; ajout++; agrandir(b, words[d], used, d); }
+        if (ajout) {
+          b.source = (b.source || "la détection") + " + le nom complet autour";
+          const ordre = b.words.map((w, j) => [words.indexOf(w), w, b.rects[j]]).sort((x, y) => x[0] - y[0]);
+          b.words = ordre.map((o) => o[1]); b.rects = ordre.map((o) => o[2]);
+        }
+      });
+      // Deux zones côte à côte avec la même étiquette (« HUGO » choisi comme nom, à côté de [PERSONNE_1]) n'en font qu'une.
+      const premier = (b) => Math.min(...b.words.map((w) => words.indexOf(w)));
+      const dernier = (b) => Math.max(...b.words.map((w) => words.indexOf(w)));
+      const ligneBoxes = p.boxes.slice(debutLigne).filter((b) => b.words && b.words.length).sort((a, b) => premier(a) - premier(b));
+      for (let i = ligneBoxes.length - 1; i > 0; i--) {
+        const a = ligneBoxes[i - 1], b = ligneBoxes[i];
+        if (a.key !== b.key || premier(b) !== dernier(a) + 1) continue;
+        b.words.forEach((w, j) => { a.words.push(w); a.rects.push(b.rects[j] || b.rects[0]); });
+        const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y);
+        a.w = Math.max(a.x + a.w, b.x + b.w) - x0; a.h = Math.max(a.y + a.h, b.y + b.h) - y0; a.x = x0; a.y = y0;
+        p.boxes.splice(p.boxes.indexOf(b), 1);
+      }
     }
+  }
+  // Un mot qui ressemble à un prénom ou à un nom : « HUGO », « Dominguez », « Muster-Meier ».
+  const MOTS_REPERES = new Set(["owner", "holder", "applicant", "titulaire", "demandeur", "demanderesse", "inhaber", "inhaberin",
+    "anmelder", "anmelderin", "name", "nom", "prenom", "vorname", "nachname", "surname", "patient", "patiente", "client", "cliente",
+    "monsieur", "madame", "mademoiselle", "herr", "frau", "mr", "mrs", "ms", "dr", "docteur", "maitre", "me", "prof",
+    "propietario", "propietaria", "titular", "solicitante", "proprietario", "titolare", "richiedente", "nome", "cognome", "nombre", "apellido",
+    "rue", "avenue", "chemin", "route", "place", "boulevard", "strasse", "via", "street", "road"]);
+  function ressembleNom(t) {
+    const m = String(t).replace(/[,;.]+$/, "");
+    if (!/^[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+$/.test(m) || m.length < 2) return false;
+    if (MOTS_REPERES.has(norm(m))) return false;
+    return !K.estCourant(m);
+  }
+  function agrandir(b, w, used, i) {
+    used.add(i);
+    const hMax = w.bbox.y1 - w.bbox.y0, pad = Math.max(3, Math.round(hMax * 0.15));
+    const r = { x: w.bbox.x0 - pad, y: w.bbox.y0 - pad, w: w.bbox.x1 - w.bbox.x0 + 2 * pad, h: w.bbox.y1 - w.bbox.y0 + 2 * pad };
+    b.rects.push(r); b.words.push(w);
+    const x0 = Math.min(b.x, r.x), y0 = Math.min(b.y, r.y);
+    b.w = Math.max(b.x + b.w, r.x + r.w) - x0; b.h = Math.max(b.y + b.h, r.y + r.h) - y0; b.x = x0; b.y = y0;
   }
 
   async function detectPages(list, message) {
@@ -2921,7 +3090,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.1";
+  const VERSION_APP = "0.8.2";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
@@ -3168,6 +3337,7 @@
       else if (!$("sheet").hidden) closeSheet();
       else if (!$("cerbere").hidden) fermerCerbere();
       else if (!$("cherchePanel").hidden) $("chercheAnnuler").click();
+      else if (!$("etiqbar").hidden) fermerEtiq();
       else if (!$("refbar").hidden) $("refCancel").click();
       else if (S.sel) $("selCancel").click();
       else if (S.cadre) $("cropCancel").click();

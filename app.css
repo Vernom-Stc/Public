@@ -437,3 +437,8 @@ details.group:not([open]){gap:0}
 .legend-ligne span{flex:1 1 12rem;min-width:0;word-break:break-word}
 .legend-ligne input{flex:1 1 10rem;min-width:0;font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:.35rem .5rem}
 .legend-ligne .hint{flex-basis:100%;margin:.1rem 0 0}
+
+/* Barre « C'est : » sur une étiquette */
+.etiq-saisie{display:inline-flex;gap:.4rem;align-items:center;flex:1 1 14rem}
+.etiq-saisie input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:.35rem .5rem}
+.etiq-aide{flex-basis:100%;margin:.2rem 0 0;color:#fff;text-shadow:0 1px 2px #000}

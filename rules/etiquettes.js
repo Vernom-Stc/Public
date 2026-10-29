@@ -7,6 +7,7 @@
  *   type           préfixe du jeton : "PERSONNE" donne [PERSONNE_1]
  *   mots           les étiquettes, sans tenir compte des majuscules ni des accents
  *   sansDeuxPoints true si l'étiquette n'est pas forcément suivie de « : » (ex. « Né le 12.03.1980 »)
+ *   valeurNom      true : ne garder que les mots qui commencent par une majuscule juste après l'étiquette (4 au plus)
  *   exemples       { trouve: [[texte, valeur attendue], ...], ignore: [...] } — vérifiés par rules/tester.js
  *
  * Uniquement des données : chacun peut compléter cette liste pour son métier ou sa langue.
@@ -17,8 +18,20 @@ Kerckhoffs.ajouterEtiquettes([
     type: "PERSONNE",
     mots: ["nom", "prénom", "nom de famille", "nom et prénom", "patient", "patiente", "assuré", "assurée",
            "client", "cliente", "requérant", "requérante", "représentant légal", "conjoint", "conjointe",
-           "name", "vorname", "first name", "last name"],
+           "name", "vorname", "first name", "last name", "nachname", "surname", "full name", "nom complet",
+           "owner", "holder", "applicant", "titulaire", "demandeur", "demanderesse", "inhaber", "inhaberin", "anmelder", "anmelderin"],
     exemples: { trouve: [["Nom : Exemple", "Exemple"], ["Patient : Jean Exemple", "Jean Exemple"], ["Nom : Exemple Prénom : Jean", "Exemple"]], ignore: ["Nombre : 3", "le nom de la rue"] }
+  },
+  {
+    // Registres et formulaires sans « : » (« Owner HUGO EXEMPLE (Mexico) », « Inhaber Max Muster »).
+    // Sans deux-points, on ne garde que les mots qui commencent par une majuscule, juste après l'étiquette.
+    id: "titulaire",
+    type: "PERSONNE",
+    mots: ["owner", "holder", "applicant", "titulaire", "demandeur", "demanderesse", "inhaber", "inhaberin", "anmelder", "anmelderin"],
+    sansDeuxPoints: true,
+    valeurNom: true,
+    exemples: { trouve: [["Owner HUGO EXEMPLE (Mexico)", "HUGO EXEMPLE"], ["Inhaber Max Muster", "Max Muster"]],
+                ignore: ["the owner of the house", "titulaire du compte", "Owner (Mexico)"] }
   },
   {
     id: "naissance",
