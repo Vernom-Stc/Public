@@ -23,7 +23,7 @@
   var sansAccent = function (s) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); };
   // Renvoie, pour une ligne de texte, les valeurs qui suivent une étiquette : [{ etiquette, debut, fin, valeur }]
   K.valeursApresEtiquettes = function (ligne) {
-    var trouves = [];
+    var trouves = [], enchainees = [];
     K.etiquettes.forEach(function (e) {
       // Sans « : », on garde les accents : « né le » ne doit pas se confondre avec « ne le ».
       var prep = e.sansDeuxPoints ? function (s) { return s.toLowerCase(); } : sansAccent;
@@ -37,15 +37,18 @@
           if (/[a-z0-9]/.test(n[j] || "")) continue;                  // fin de mot (« nom » ≠ « nombre »)
           var apres = n.slice(j).match(/^\.?\s*(:)?\s*/); // « Tél. : », « Nom: », « Né le »
           var deuxPoints = !!apres[1];
+          // Étiquettes enchaînées : « Personne assurée, année de naissance : Jean Exemple, 2009 ».
+          var lien = !deuxPoints && n.slice(j).match(/^\s*(,|\/|et|und|e)\s*/);
+          if (lien) enchainees.push({ etiquette: e, mot: mot, debutEtiquette: i, suite: j + lien[0].length });
           if (!deuxPoints && !e.sansDeuxPoints) continue;            // « Nom : » oui, « le nom de » non
           var debut = j + apres[0].length;
-          trouves.push({ etiquette: e, debutEtiquette: i, debut: debut });
+          trouves.push({ etiquette: e, mot: mot, debutEtiquette: i, debut: debut });
         }
       });
     });
     trouves.sort(function (a, b) { return a.debutEtiquette - b.debutEtiquette; });
     // La valeur va jusqu'à l'étiquette suivante sur la même ligne, ou jusqu'au bout de la ligne.
-    return trouves.map(function (t, k) {
+    var res = trouves.map(function (t, k) {
       var suivante = trouves.slice(k + 1).find(function (x) { return x.debutEtiquette >= t.debut; });
       var fin = suivante ? suivante.debutEtiquette : ligne.length;
       var valeur = ligne.slice(t.debut, fin).replace(/[\s,;]+$/, "");
@@ -55,8 +58,21 @@
         var nom = valeur.match(/^(?:[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+(?:\s+|$)){1,4}/);
         valeur = nom ? nom[0].trim() : "";
       }
-      return { etiquette: t.etiquette, debut: t.debut, fin: t.debut + valeur.length, valeur: valeur };
+      return { etiquette: t.etiquette, mot: t.mot, debutEtiquette: t.debutEtiquette, debut: t.debut, fin: t.debut + valeur.length, valeur: valeur };
     }).filter(function (v) { return /[A-Za-zÀ-ÿ0-9]/.test(v.valeur); });
+    // Une étiquette enchaînée prend la première partie de la valeur (jusqu'à la virgule) ; la suivante garde le reste.
+    var sortie = [];
+    res.forEach(function (v) {
+      var avant = enchainees.filter(function (a) { return a.suite === v.debutEtiquette; })[0];
+      var virgule = v.valeur.indexOf(",");
+      if (avant && virgule > 0) {
+        var p1 = v.valeur.slice(0, virgule).replace(/\s+$/, ""), reste = v.valeur.slice(virgule + 1), decal = virgule + 1 + (reste.length - reste.replace(/^\s+/, "").length);
+        reste = reste.replace(/^\s+/, "");
+        if (/[A-Za-zÀ-ÿ0-9]/.test(p1)) sortie.push({ etiquette: avant.etiquette, mot: avant.mot, debut: v.debut, fin: v.debut + p1.length, valeur: p1 });
+        if (/[A-Za-zÀ-ÿ0-9]/.test(reste)) sortie.push({ etiquette: v.etiquette, mot: v.mot, debut: v.debut + decal, fin: v.debut + decal + reste.length, valeur: reste });
+      } else sortie.push(v);
+    });
+    return sortie.map(function (v) { return { etiquette: v.etiquette, mot: v.mot, debut: v.debut, fin: v.fin, valeur: v.valeur }; });
   };
   /* ---- Étiquettes au-dessus de la valeur (voir rules/etiquettes.js : ajouterVocabulaire) ---- */
   K.vocabulaire = K.vocabulaire || [];
@@ -64,7 +80,8 @@
   ("de du des la le les l d di del della dello dei da dal dals of the and und et e ed ou oder o resp a au alla zum zur der den dem al il in " +
    "en if applicable where le cas echeant falls zutreffend se del caso jour mois annee tag monat jahr day month year giorno mese anno " +
    "jj mm aaaa tt jjjj gg an usuel usuels anterieur anterieurs demandeur demanderesse applicant applicants cas echeant ment " +
-   "l'inscripziun l'extract dell'atto dell'estratto l'acte l'extrait").split(" ").forEach(function (m) { LIAISON[m] = true; });
+   "l'inscripziun l'extract dell'atto dell'estratto l'acte l'extrait antragsteller antragstellers antragstellerin antragssteller " +
+   "gesuchsteller gesuchstellerin gesuchstellenden richiedente requerant requerante").split(" ").forEach(function (m) { LIAISON[m] = true; });
   K.ajouterVocabulaire = function (parType) {
     Object.keys(parType).forEach(function (type) {
       parType[type].forEach(function (phrase) { K.vocabulaire.push({ type: type, mots: sansAccent(phrase).split(/[\s]+/).filter(Boolean) }); });
@@ -106,8 +123,9 @@
   // Un mot qui fait partie du vocabulaire des étiquettes (« Prénoms », « Cognome ») : jamais appris comme un nom.
   // Une ligne sans aucun mot (formats « [JJ/MM/AAAA] », traits, cases) : ni étiquette, ni valeur.
   K.ligneVide = function (t) { return motsLigne(t).length === 0; };
-  K.estMotEtiquette = function (mot) {
+  K.estMotEtiquette = function (mot, avecLiaison) {
     var m = motsLigne(mot)[0]; if (!m) return false;
+    if (avecLiaison && LIAISON[m] && m.length >= 6) return true; // « Antragstellers », « demandeur » : jamais appris comme un nom
     return K.vocabulaire.some(function (v) { return v.mots.indexOf(m) >= 0 && v.mots.length <= 3; });
   };
   // Une ligne faite seulement d'étiquettes (« Name | Vornamen », « Nom / Name / Cognome / Num ») : les types, partie par partie.
@@ -115,6 +133,24 @@
     var parties = String(texte).split("|");
     var types = parties.map(partieEtiquette);
     return types.every(function (t) { return !!t; }) ? types : null;
+  };
+  // Une longue étiquette qui COMMENCE par une étiquette connue d'au moins deux mots
+  // (« 30. Nom et prénom de la ou des personnes qui invitent… ») : la suite de la phrase n'y change rien.
+  K.debutEtiquette = function (texte) {
+    var t = String(texte).replace(/^[\s*]*\d{1,2}[.)]?\s*/, "");
+    var mots = motsLigne(t); if (mots.length < 4) return null;
+    for (var k = 0; k < K.vocabulaire.length; k++) {
+      var v = K.vocabulaire[k]; if (v.mots.length < 2 || v.mots.length > mots.length) continue;
+      var ok = true;
+      for (var j = 0; ok && j < v.mots.length; j++) if (!motProche(mots[j], v.mots[j])) ok = false;
+      if (ok) return [v.type];
+    }
+    return null;
+  };
+  K.exemplesDebutEtiquette = {
+    oui: ["*30. Nom et prénom de la ou des personnes qui invitent dans l'État membre", "30. Surname and first name of the inviting person(s) in the Member State(s).",
+          "Cognome e nome della persona che compila il modulo di domanda"],
+    non: ["Nom : Exemple", "Jean EXEMPLE", "Nom et prénom"]
   };
   K.exemplesLigneEtiquette = {
     oui: ["Data da naschientsche", "Name", "Nom de célibataire | Autres noms", "7 Nom / Name / Cognome / Num", "Geburtsdatum | Geburtszeit", "1. Surname (Family name) / Nom (nom de famille)",
@@ -167,7 +203,7 @@
   };
   // Les mots d'une adresse ou d'une référence qui valent la peine d'être cherchés un par un.
   // Les petits mots courants (« rue », « de », « chemin »…) ne sont pas cherchés seuls : ils sont partout.
-  var COURANTS = ("rue route avenue av chemin ch boulevard bd place pl allee impasse quai sentier strasse str weg gasse platz " +
+  var COURANTS = ("rue route avenue av chemin ch boulevard bd place pl allee impasse quai sentier strasse str weg gasse platz via viale piazza corso vicolo street road " +
     "de du des la le les et en au aux sur sous chez case postale numero no nr ref reference monsieur madame mme").split(" ");
   K.motsACherche = function (valeur) {
     return String(valeur).split(/[\s,;\/-]+/).filter(function (m) {

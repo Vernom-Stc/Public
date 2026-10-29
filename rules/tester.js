@@ -82,6 +82,8 @@ for (const e of K.etiquettes) {
 }
 console.log(`  ${K.etiquettes.length} groupe(s) d'étiquettes vérifié(s)`);
 console.log("Étiquettes au-dessus de la valeur");
+for (const t of K.exemplesDebutEtiquette.oui) if (!K.debutEtiquette(t)) ko(`« ${t} » devrait être reconnu comme le début d'une longue étiquette`);
+for (const t of K.exemplesDebutEtiquette.non) if (K.debutEtiquette(t)) ko(`« ${t} » ne devrait pas être pris pour une longue étiquette`);
 for (const t of K.exemplesLigneEtiquette.oui) if (!K.ligneEtiquette(t)) ko(`« ${t} » devrait être reconnu comme une ligne d'étiquettes`);
 for (const t of K.exemplesLigneEtiquette.non) if (K.ligneEtiquette(t)) ko(`« ${t} » ne devrait pas être pris pour une étiquette (obtenu : ${K.ligneEtiquette(t)})`);
 for (const code of Object.keys(K.pays)) tester(`${K.pays[code].nom} (${code})`, K.pays[code].regles);

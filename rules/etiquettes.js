@@ -18,9 +18,13 @@ Kerckhoffs.ajouterEtiquettes([
     type: "PERSONNE",
     mots: ["nom", "prénom", "nom de famille", "nom et prénom", "patient", "patiente", "assuré", "assurée",
            "client", "cliente", "requérant", "requérante", "représentant légal", "conjoint", "conjointe",
+           "personne assurée", "personne assurée", "assuré(e)", "preneur d'assurance", "preneuse d'assurance", "titulaire de la police",
+           "versicherte person", "versicherter", "versicherte", "versicherungsnehmer", "versicherungsnehmerin",
+           "persona assicurata", "assicurato", "assicurata", "contraente",
            "name", "vorname", "first name", "last name", "nachname", "surname", "full name", "nom complet",
            "owner", "holder", "applicant", "titulaire", "demandeur", "demanderesse", "inhaber", "inhaberin", "anmelder", "anmelderin"],
-    exemples: { trouve: [["Nom : Exemple", "Exemple"], ["Patient : Jean Exemple", "Jean Exemple"], ["Nom : Exemple Prénom : Jean", "Exemple"]], ignore: ["Nombre : 3", "le nom de la rue"] }
+    exemples: { trouve: [["Nom : Exemple", "Exemple"], ["Patient : Jean Exemple", "Jean Exemple"], ["Nom : Exemple Prénom : Jean", "Exemple"],
+                         ["Personne assurée, année de naissance: Léa Exemple, 2009", "Léa Exemple"]], ignore: ["Nombre : 3", "le nom de la rue"] }
   },
   {
     // Registres et formulaires sans « : » (« Owner HUGO EXEMPLE (Mexico) », « Inhaber Max Muster »).
@@ -36,9 +40,11 @@ Kerckhoffs.ajouterEtiquettes([
   {
     id: "naissance",
     type: "NAISSANCE",
-    mots: ["né le", "née le", "né(e) le", "date de naissance", "ddn", "geburtsdatum", "date of birth", "dob"],
+    mots: ["né le", "née le", "né(e) le", "date de naissance", "année de naissance", "ddn", "geburtsdatum", "jahrgang", "geburtsjahr",
+           "anno di nascita", "data di nascita", "date of birth", "year of birth", "dob"],
     sansDeuxPoints: true,
-    exemples: { trouve: [["Né le 12.03.1980", "12.03.1980"], ["Date de naissance : 1er mars 1980", "1er mars 1980"]], ignore: ["il ne le sait pas"] }
+    exemples: { trouve: [["Né le 12.03.1980", "12.03.1980"], ["Date de naissance : 1er mars 1980", "1er mars 1980"],
+                         ["Personne assurée, année de naissance: Léa Exemple, 2009", "2009"]], ignore: ["il ne le sait pas"] }
   },
   {
     id: "adresse",
@@ -49,9 +55,11 @@ Kerckhoffs.ajouterEtiquettes([
   {
     id: "numero",
     type: "NUMERO",
-    mots: ["ref-nr", "ref.-nr.", "n° d'assuré", "no d'assuré", "numéro d'assuré", "n° avs", "n° de dossier", "no de dossier", "n° patient",
+    mots: ["ref-nr", "ref.-nr.", "no de police", "n° de police", "numéro de police", "police n°", "police no", "no police",
+           "policennummer", "police-nr.", "police-nr", "numero di polizza", "polizza n.", "no client", "numéro de client", "n° client",
+           "kundennummer", "kunden-nr.", "numero cliente", "no d'assuré", "n° d'assuré", "numéro d'assuré", "n° avs", "n° de dossier", "no de dossier", "n° patient",
            "numéro de patient", "n° de police", "n° client", "n° de contribuable", "versichertennummer"],
-    exemples: { trouve: [["N° de dossier : 2026-4471", "2026-4471"]], ignore: [] }
+    exemples: { trouve: [["N° de dossier : 2026-4471", "2026-4471"], ["No de police: 1234567", "1234567"], ["Policennummer: 99.123.456", "99.123.456"]], ignore: [] }
   },
   {
     id: "contact",
@@ -84,6 +92,8 @@ Kerckhoffs.ajouterVocabulaire({
     "nom avant le mariage", "nom au moment de la delivrance de l'acte", "autre partie du nom", "autres parties du nom", "nom et prenom",
     "cognome", "nome", "nomi", "cognome da nubile/celibe", "cognome da nubile", "celibe", "cognome alla nascita", "altri nomi ufficiali",
     "cognome prima del matrimonio", "cognome al momento del rilascio dell'estratto", "altra parte del cognome", "altre parti del cognome",
+    "nom et prenom", "nom et prenoms", "nom, prenom", "surname and first name", "surname, first name", "cognome e nome", "cognome, nome",
+    "name und vorname", "name, vorname", "num e prenum",
     "surname", "family name", "first name", "first names", "given name", "given names", "surname at birth", "former family name",
     "former family names", "full name",
     "num", "prenums", "num da nubil", "num da nubila resp. nubil", "auters nums uffizials", "num avant la maridaglia",

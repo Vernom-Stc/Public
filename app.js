@@ -481,6 +481,8 @@
     c.fillStyle = couleur || "#000"; c.strokeStyle = couleur || "#000";
     if (st.etiq) st.etiq.rects.forEach((r) => c.fillRect(r.x, r.y, r.w, r.h));
     if (st.kind === "rect") { c.fillRect(st.x, st.y, st.w, st.h); c.restore(); return; }
+    // Le trait du doigt s'est rangé sur les mots touchés : seuls leurs rectangles exacts restent masqués.
+    if (st.surMots) { c.restore(); return; }
     c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = st.w;
     if (st.pts.length === 1) {
       c.beginPath(); c.arc(st.pts[0][0], st.pts[0][1], st.w / 2, 0, Math.PI * 2); c.fill();
@@ -837,7 +839,7 @@
       const mots = l.words.filter((w) => {
         const b = w.bbox; let n = 0;
         for (const fx of [0.15, 0.5, 0.85]) for (const fy of [0.3, 0.7]) if (couvre(b.x0 + (b.x1 - b.x0) * fx, b.y0 + (b.y1 - b.y0) * fy)) n++;
-        return n >= 3;
+        return n >= 2;
       });
       if (mots.length) groupes.push(mots);
     });
@@ -856,6 +858,10 @@
     }
     const tous = groupes.flat();
     st.etiq = { rects: rectsDe(tous), zone: unionDe(rectsDe(principal)), key, type, value };
+    // Le trait couvre-t-il surtout ces mots ? Alors il se range dessus (rien ne dépasse, aucun bout de lettre ne reste).
+    const zoneMots = unionDe(st.etiq.rects), marge = st.w;
+    const dehors = st.pts.filter(([x, y]) => x < zoneMots.x - marge || x > zoneMots.x + zoneMots.w + marge || y < zoneMots.y - marge || y > zoneMots.y + zoneMots.h + marge).length;
+    st.surMots = dehors <= st.pts.length * 0.2;
   }
 
   // Les peluches : quand on efface, l'encre des lettres tombe en petits grains, comme sous une gomme.
@@ -952,7 +958,8 @@
     } else if (draft.kind === "line") {
       const last = draft.pts[draft.pts.length - 1];
       draft.pts.push(pt);
-      strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] });
+      // Pendant le geste : un trait léger, qui laisse voir les mots touchés.
+      strokePath(ctx, { kind: "line", w: draft.w, pts: [last, pt] }, "rgba(0, 35, 102, 0.28)");
     } else if (draft.kind === "ajuster") {
       const { r0, ou } = draft, dx = pt[0] - draft.pt0[0], dy = pt[1] - draft.pt0[1], r = draft.cible.rect;
       if (ou === "milieu") { r.x = r0.x + dx; r.y = r0.y + dy; }
@@ -1683,7 +1690,8 @@
       const x0 = Math.min(...ws.map((w) => w.bbox.x0)), x1 = Math.max(...ws.map((w) => w.bbox.x1));
       const y0 = Math.min(...ws.map((w) => w.bbox.y0)), y1 = Math.max(...ws.map((w) => w.bbox.y1));
       const texte = l.words.map((w) => w.text).join(" ");
-      return { i, x0, x1, y0, y1, h: Math.max(4, y1 - y0), texte, types: K.ligneEtiquette ? K.ligneEtiquette(texte) : null };
+      const types = (K.ligneEtiquette && K.ligneEtiquette(texte)) || (K.debutEtiquette && K.debutEtiquette(texte));
+      return { i, x0, x1, y0, y1, h: Math.max(4, y1 - y0), texte, types: types || null };
     }).filter(Boolean);
     // Les lignes sous « a », dans la colonne qui commence en x0 (celle de la première étiquette de la pile).
     const dessous = (a, x0 = a.x0) => L.filter((b) => b !== a && b.y0 >= a.y1 - a.h * 0.3 && b.x0 >= x0 - a.h * 1.2 && b.x0 <= x0 + a.h * 3)
@@ -1692,6 +1700,8 @@
     const nbSignes = (t) => t.replace(/[^A-Za-zÀ-ÿ0-9]/g, "").length;
     const bruitLu = (x) => !/\d/.test(x.texte) && (nbSignes(x.texte) <= 3 || K.ligneVide(x.texte));
     const avecMotEtiquette = (x) => x.texte.split(/[\s|\/]+/).some((w) => w.length > 1 && K.estMotEtiquette(w));
+    // La suite d'une longue étiquette : une phrase (quatre mots ou plus, surtout en minuscules).
+    const phrase = (x) => { const m = x.texte.split(/\s+/).filter((w) => /[A-Za-zÀ-ÿ]/.test(w)); return m.length >= 4 && m.filter((w) => /^[a-zà-ÿ(]/.test(w)).length >= m.length / 2; };
     const sortie = new Map(), prises = new Set();
     const ajouter = (v, a) => {
       const morceaux = [], types = a.types;
@@ -1704,6 +1714,21 @@
       });
       if (morceaux.length) sortie.set(v.i, (sortie.get(v.i) || []).concat(morceaux));
     };
+    // Le bloc adresse du destinataire : « Madame » (sans virgule, seul sur sa ligne), puis le nom, puis l'adresse.
+    const CIVILITE = /^(madame|monsieur|mademoiselle|madame et monsieur|monsieur et madame|messieurs|famille|herr|herrn|frau|familie|herr und frau|signora|signor|signore|egregio signor|gentile signora|mr\.?|mrs\.?|ms\.?)$/i;
+    for (const a of L) {
+      if (!CIVILITE.test(a.texte.trim()) || prises.has(a.i)) continue;
+      let bas = a, k = 0;
+      for (const b of L.filter((x) => x.y0 >= a.y1 - a.h * 0.3 && Math.abs(x.x0 - a.x0) <= a.h * 2).sort((u, v) => u.y0 - v.y0)) {
+        if (k >= 4 || b.y0 - bas.y1 > bas.h * 1.8) break;
+        if (bruitLu(b) || prises.has(b.i) || b.texte.length > 50) continue;
+        const type = k === 0 && !/\d/.test(b.texte) ? "PERSONNE" : "ADRESSE";
+        prises.add(b.i);
+        ajouter(b, { types: [type], texte: k === 0 ? "nom du destinataire" : "adresse du destinataire" });
+        bas = b; k++;
+      }
+      if (k) prises.add(a.i);
+    }
     // Étiquette à gauche, valeur à droite sur la même ligne (tableaux, cases « père / mère ») : une ou plusieurs colonnes.
     for (const a of L) {
       if (!a.types) continue;
@@ -1725,7 +1750,7 @@
       for (;;) {
         const suivante = suivantes(bas)[0];
         if (!suivante || suivante.y0 - bas.y1 > bas.h * 1.6) break;
-        if (!suivante.types && !contientEtiquette(suivante) && !avecMotEtiquette(suivante)) break;
+        if (!suivante.types && !contientEtiquette(suivante) && !avecMotEtiquette(suivante) && !phrase(suivante)) break;
         pile.push(suivante); bas = suivante;
       }
       pile.forEach((x) => prises.add(x.i));
@@ -1816,7 +1841,7 @@
       }
       // Valeurs qui suivent une étiquette de formulaire (« Nom : », « Né le »…), voir rules/etiquettes.js
       for (const v of K.valeursApresEtiquettes(raw)) {
-        take(rr, v.debut, v.fin, v.etiquette.type, v.valeur, v.etiquette.type + "|" + norm(v.valeur), null, "ce qui suit l'étiquette « " + v.etiquette.mots[0] + " »");
+        take(rr, v.debut, v.fin, v.etiquette.type, v.valeur, v.etiquette.type + "|" + norm(v.valeur), null, "ce qui suit l'étiquette « " + (v.mot || v.etiquette.mots[0]) + " »");
       }
       // Identifiants reconnus à leur forme, dans n'importe quel pays (rules/registre.js : K.formeIdentifiant).
       // Forme très typique : masqué d'office. Forme douteuse : signalé avant l'envoi, dans Remove Before Flight.
@@ -1952,7 +1977,7 @@
     let nouveau = false;
     for (const p of S.pages) for (const [, morceaux] of valeursAuDessus(p)) for (const m of morceaux) {
       if (!TYPES_APPRIS.includes(m.type) || /\d{3,}/.test(m.valeur) && m.type === "PERSONNE" || !K.motsACherche(m.valeur).length) continue;
-      if (m.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w))) continue;
+      if (m.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w, true))) continue;
       if (m.type === "PERSONNE" && !m.valeur.split(/\s+/).every((w) => /^[A-ZÀ-ÖØ-Ý]/.test(w))) continue;
       if (m.type === "ADRESSE" && !/\d/.test(m.valeur)) continue; // une adresse a un numéro (rue ou code postal)
       if (m.type === "ADRESSE" && ADRESSE_ADMIN.test(m.valeur)) continue;
@@ -1965,7 +1990,7 @@
       for (const v of K.valeursApresEtiquettes(raw)) {
         const type = v.etiquette.type;
         if (!TYPES_APPRIS.includes(type) || /\d{3,}/.test(v.valeur) && type === "PERSONNE") continue;
-        if (K.estMotEtiquette && v.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w))) continue;
+        if (K.estMotEtiquette && v.valeur.split(/\s+/).some((w) => K.estMotEtiquette(w, true))) continue;
         if (type === "PERSONNE" && !v.valeur.split(/\s+/).filter(Boolean).every((w) => /^[A-ZÀ-ÖØ-Ý(]/.test(w))) continue;
         if (type === "ADRESSE" && !/\d/.test(v.valeur)) continue;
         if (!K.motsACherche(v.valeur).length) continue;
@@ -3180,7 +3205,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.3";
+  const VERSION_APP = "0.8.4";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
