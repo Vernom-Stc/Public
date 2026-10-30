@@ -2098,8 +2098,12 @@
   /* ------------------------------------------------------------- export */
   // La mention en bas des documents envoyés. Sans le mode strict, elle est toujours là.
   // Seul un document contrôlé en mode strict peut partir sans mention, si l'utilisateur le choisit.
-  const avecMention = () => !strict || $("optMention").checked;
-  const texteMention = () => "Masqué avec Kerckhoffs · " + (S.pages.some((p) => styleDe(p) === "papier") ? "effacé couleur papier · " : "") +
+  // Un effacement couleur papier ne se voit pas : la mention reste alors toujours, pour qu'un document ne puisse pas
+  // passer pour intact. En noir ou en flou, les masques se voient : au niveau Strict, on peut retirer la mention.
+  const papierPresent = () => S.pages.some((p) => styleDe(p) === "papier");
+  const avecMention = () => !strict || papierPresent() || $("optMention").checked;
+  // La mention dit qui a masqué : la personne, avec l'outil. Ce n'est pas une garantie de Kerckhoffs.
+  const texteMention = () => "Masqué par l'utilisateur, avec Kerckhoffs · " + (papierPresent() ? "effacé couleur papier · " : "") +
     (strict ? "vérifié point par point" : "non vérifié point par point");
   function avecBande(c, masked) {
     if (!masked || !avecMention()) return c;
@@ -2866,7 +2870,8 @@
     const men = $("cerbereMention"); men.textContent = "";
     if ($("optMask").checked) {
       men.append(document.createTextNode(avecMention() ? `Ce document portera en bas la mention « ${texteMention()} ».` : "Ce document partira sans mention."));
-      if (strict) {
+      if (strict && papierPresent()) men.append(document.createTextNode(" Elle reste toujours quand un effacement couleur papier est présent : il ne se voit pas."));
+      else if (strict) {
         const b = document.createElement("button"); b.type = "button"; b.className = "btn small";
         b.textContent = avecMention() ? "La retirer" : "La remettre";
         b.addEventListener("click", () => { $("optMention").checked = !$("optMention").checked; changed(); cerbereOk = -1; afficherCerbere(); });
@@ -3259,7 +3264,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.5";
+  const VERSION_APP = "0.8.6";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
