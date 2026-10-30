@@ -40,7 +40,10 @@
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
-      "files": [{ "name": "fichiers", "accept": ["image/*", "application/pdf", ".pdf"] }]
+      "title": "titre",
+      "text": "texte",
+      "url": "lien",
+      "files": [{ "name": "fichiers", "accept": ["image/*", "application/pdf", ".pdf", "text/plain", ".txt"] }]
     }
   }
 }

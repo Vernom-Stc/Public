@@ -60,3 +60,37 @@ Kerckhoffs.ajouterCerbere({
     { mot: "divorce" }, { mot: "séparation" }, { mot: "religion" }, { mot: "syndicat" }
   ]
 });
+
+/*
+ * La forme d'un nom, dans n'importe quelle langue : un NOM en majuscules à côté d'un Prénom.
+ *  - avec un prénom courant (« Jean EXEMPLE », « EXEMPLE Jean ») : masqué d'office ;
+ *  - avec un autre mot à majuscule (« Testeuse DUPONT ») : seulement signalé avant l'envoi.
+ * Les sigles et mots de gestion (SA, AG, CHF, TVA…) ne comptent pas comme des noms.
+ */
+(function (K) {
+  var regle = K.cerbere.regles.filter(function (r) { return r.id === "prenom"; })[0];
+  var m = regle && regle.re.source.match(/\(\?:(.*)\)\(\?!/);
+  if (!m) return;
+  var P = "(?:" + m[1] + ")", L = "(?<![A-Za-zÀ-ÖØ-öø-ÿ])", R = "(?![A-Za-zÀ-ÖØ-öø-ÿ])";
+  var NOM = "[A-ZÀ-ÖØ-Ý]{2,}(?:[-' ][A-ZÀ-ÖØ-Ý]{2,})?";
+  var SIGLES = /^(SA|AG|SARL|GMBH|LTD|INC|CHF|EUR|USD|TVA|MWST|IVA|AVS|AHV|AI|IV|LPP|BVG|LAMAL|KVG|PDF|CEO|CH|UE|EU|OK|NB|PS)$/;
+  var pasSigle = function (v) { return !v.split(/[\s'-]+/).some(function (w) { return SIGLES.test(w) || /^[A-ZÀ-ÖØ-Ý]{2,}$/.test(w) && w.length <= 3 && !new RegExp("^" + P + "$").test(w); }); };
+  K.ajouterCommun([{
+    id: "prenom-nom",
+    label: "Prénom et NOM",
+    type: "PERSONNE",
+    re: new RegExp(L + "(?:" + P + "(?:[- ]" + P + ")?\\s+" + NOM + "|" + NOM + "\\s+" + P + "(?:[- ]" + P + ")?)" + R, "g"),
+    check: pasSigle,
+    silent: true,
+    exemples: { trouve: ["Jean EXEMPLE", "EXEMPLE Jean", "Marie-Claire DUPONT", "MUSTER Anna"], ignore: ["Total CHF", "Jean SA", "Votre DOSSIER"] }
+  }]);
+  K.cerbere.regles.push({
+    id: "nom-forme",
+    label: "Nom possible (NOM en majuscules et Prénom)",
+    type: "NOM",
+    re: new RegExp(L + "(?:[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ'’-]{2,}\\s+" + NOM + "|" + NOM + "\\s+[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ'’-]{2,})" + R, "g"),
+    check: function (v) { return pasSigle(v) && !v.split(/\s+/).some(function (w) { return /^[A-ZÀ-ÖØ-Ý][a-zà-öø-ÿ]/.test(w) && K.estCourant(w); }); },
+    silent: true,
+    exemples: { trouve: ["Testeuse DUPONT", "DUPONT Testeuse"], ignore: ["Total CHF", "Votre AVS", "Votre DOSSIER"] }
+  });
+})(Kerckhoffs);

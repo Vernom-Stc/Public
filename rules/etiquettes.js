@@ -44,7 +44,7 @@ Kerckhoffs.ajouterEtiquettes([
            "anno di nascita", "data di nascita", "date of birth", "year of birth", "dob"],
     sansDeuxPoints: true,
     exemples: { trouve: [["Né le 12.03.1980", "12.03.1980"], ["Date de naissance : 1er mars 1980", "1er mars 1980"],
-                         ["Personne assurée, année de naissance: Léa Exemple, 2009", "2009"]], ignore: ["il ne le sait pas"] }
+                         ["Personne assurée, année de naissance: Léa Exemple, 2009", "2009"], ["né le 05.05.1985, domicilié à Lugano", "05.05.1985"]], ignore: ["il ne le sait pas"] }
   },
   {
     id: "adresse",
@@ -55,7 +55,8 @@ Kerckhoffs.ajouterEtiquettes([
   {
     id: "numero",
     type: "NUMERO",
-    mots: ["ref-nr", "ref.-nr.", "no de police", "n° de police", "numéro de police", "police n°", "police no", "no police",
+    mots: ["ref-nr", "ref.-nr.", "n° avs", "no avs", "numéro avs", "numero avs", "n. avs", "ahv-nr.", "ahv-nr", "ahv-nummer", "ahv nr",
+           "sozialversicherungsnummer", "numéro d'assuré avs", "numéro d'assurance sociale", "social security number", "no de police", "n° de police", "numéro de police", "police n°", "police no", "no police",
            "policennummer", "police-nr.", "police-nr", "numero di polizza", "polizza n.", "no client", "numéro de client", "n° client",
            "kundennummer", "kunden-nr.", "numero cliente", "no d'assuré", "n° d'assuré", "numéro d'assuré", "n° avs", "n° de dossier", "no de dossier", "n° patient",
            "numéro de patient", "n° de police", "n° client", "n° de contribuable", "versichertennummer"],

@@ -70,6 +70,14 @@
         exemples: { trouve: ["12 rue Louis-De-Montfalcon", "3 bis avenue de la Gare"], ignore: ["12 mois"] }
       },
       {
+        // Version italienne et romanche : via, viale, piazza… suivie d'un nom à majuscule puis d'un numéro
+        id: "via",
+        label: "Adresses (via, viale, piazza…)",
+        type: "ADRESSE",
+        re: /\b(?:[Vv]ia|[Vv]iale|[Pp]iazza|[Pp]iazzale|[Vv]icolo|[Cc]orso|[Ss]trada|[Ss]alita|[Ll]argo|[Cc]ontrada)\s+(?:[A-ZÀ-Ý][A-Za-zÀ-ÿ'’.-]*\s+|(?:da|del|della|dei|delle|di|al|alla|San|Santa)\s+){1,4}\d{1,4}[a-zA-Z]?\b/g,
+        exemples: { trouve: ["Via Esempio 1", "Viale della Stazione 12", "Piazza Grande 3"], ignore: ["envoyé via la poste 3 fois"] }
+      },
+      {
         // Version alémanique
         id: "strasse",
         label: "Adresses (Strasse, Weg, Gasse…)",

@@ -200,12 +200,61 @@
   const newPage = (img, name, source) => ({ img, name, strokes: [], boxes: [], lines: null, source: source || null, off: { x: 0, y: 0 } });
   const sourceDe = (blob, largeur, c) => (blob && largeur > c.width * 1.05 ? { blob, k: largeur / c.width } : null);
 
+  // Un texte collé ou partagé devient une page : les mots sont placés par Kerckhoffs lui-même (pas besoin de lecture),
+  // puis la détection, les étiquettes et le contrôle avant envoi s'appliquent comme pour une photo.
+  function pageDepuisTexte(texte, nom) {
+    const marge = 60, taille = 26, interligne = 38, police = `${taille}px ui-monospace, Menlo, Consolas, monospace`;
+    const mesure = document.createElement("canvas").getContext("2d"); mesure.font = police;
+    // Une ligne par paragraphe, aussi longue que possible : une adresse ou un nom n'est jamais coupé en deux.
+    const largeurMax = 3600, lignes = [];
+    String(texte).replace(/\r\n?/g, "\n").split("\n").forEach((para) => {
+      let courante = [];
+      for (const mot of para.split(/\s+/).filter(Boolean)) {
+        const essai = courante.concat(mot).join(" ");
+        if (courante.length && mesure.measureText(essai).width > largeurMax) { lignes.push(courante); courante = [mot]; }
+        else courante.push(mot);
+      }
+      lignes.push(courante);
+    });
+    const W = Math.max(1240, Math.ceil(Math.max(...lignes.map((l) => mesure.measureText(l.join(" ")).width))) + 2 * marge);
+    const c = document.createElement("canvas");
+    c.width = W; c.height = Math.max(400, marge * 2 + lignes.length * interligne);
+    const x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height);
+    x.fillStyle = "#111"; x.font = police; x.textBaseline = "top";
+    const p = newPage(c, nom || "texte");
+    p.lines = []; p.texte = true;
+    lignes.forEach((mots, i) => {
+      const y = marge + i * interligne; let cx = marge; const words = [];
+      for (const m of mots) {
+        const w = mesure.measureText(m).width;
+        x.fillText(m, cx, y);
+        words.push({ text: m, bbox: { x0: cx, y0: y, x1: cx + w, y1: y + taille }, conf: 99 });
+        cx += w + mesure.measureText(" ").width;
+      }
+      p.lines.push({ words });
+    });
+    return p;
+  }
+  function ouvrirTexte(texte, nom) {
+    if (!String(texte || "").trim()) return false;
+    closeSheet();
+    if ($("work").hidden) openWork();
+    addPages([pageDepuisTexte(texte, nom)]);
+    const r = document.querySelector('input[name="fmt"][value="text"]');
+    if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
+    setStatus("Texte collé : relisez, puis « Copier » pour coller le texte masqué dans l'IA.", true);
+    return true;
+  }
+
   async function addFiles(files) {
     if (!files.length) return;
     const added = [];
     for (const f of files) {
       try {
-        if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
+        if (f.type === "text/plain") {
+          added.push(pageDepuisTexte(await f.text(), f.name || "texte"));
+        } else if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) {
           setStatus("Lecture du PDF…");
           // Le PDF est redessiné en images : texte caché, calques, formulaires et métadonnées disparaissent.
           const pdf = await pdfjsLib.getDocument({ data: await f.arrayBuffer(), isEvalSupported: false, disableFontFace: false }).promise;
@@ -233,6 +282,11 @@
       }
     }
     addPages(added);
+    // Que du texte : l'envoi se fait en texte (masqué), à coller dans l'IA.
+    if (added.length && added.every((p) => p.texte)) {
+      const r = document.querySelector('input[name="fmt"][value="text"]');
+      if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
   }
 
   function addPages(added) {
@@ -3205,7 +3259,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.4";
+  const VERSION_APP = "0.8.5";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
@@ -3364,7 +3418,7 @@
   const ordinateur = !estTelephone();
   ["choixPC", "mColler", "mCapture", "emptyColler"].forEach((id) => { $(id).hidden = !ordinateur; });
   if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) { $("goCapture").hidden = true; $("mCapture").hidden = true; }
-  const accepte = (f) => f && (/^image\//.test(f.type) || f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""));
+  const accepte = (f) => f && (/^image\//.test(f.type) || f.type === "application/pdf" || /\.pdf$/i.test(f.name || "") || f.type === "text/plain");
   function ouvrirFichiers(files) {
     files = files.filter(accepte);
     if (!files.length) return false;
@@ -3376,7 +3430,11 @@
   // Ctrl+V : une capture d'écran collée s'ouvre directement. Rien n'est écrit sur le disque.
   document.addEventListener("paste", (e) => {
     const files = [...((e.clipboardData && e.clipboardData.files) || [])];
-    if (files.some(accepte)) { e.preventDefault(); ouvrirFichiers(files); }
+    if (files.some(accepte)) { e.preventDefault(); ouvrirFichiers(files); return; }
+    // Un texte collé ailleurs que dans un champ : il devient une page à masquer.
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "") || (e.target && e.target.isContentEditable)) return;
+    const texte = e.clipboardData && e.clipboardData.getData("text/plain");
+    if (texte && texte.trim()) { e.preventDefault(); ouvrirTexte(texte, "texte collé"); }
   });
   async function collerPressePapiers() {
     try {
@@ -3384,6 +3442,7 @@
       const files = [];
       for (const it of items) for (const type of it.types) if (/^image\//.test(type)) files.push(new File([await it.getType(type)], "capture.png", { type }));
       if (ouvrirFichiers(files)) return;
+      try { const t = await navigator.clipboard.readText(); if (ouvrirTexte(t, "texte collé")) return; } catch (e) {}
       setStatus("Aucune image dans le presse-papiers. Faites d'abord une capture (Windows : Win+Maj+S ; Mac : Cmd+Maj+4).", true);
       if ($("work").hidden) alerteAccueil("Aucune image dans le presse-papiers. Faites d'abord une capture (Windows : Win+Maj+S ; Mac : Cmd+Maj+4), puis Ctrl+V.");
     } catch (e) {

@@ -7,7 +7,7 @@
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.8.4";
+const VERSION = "kerckhoffs-v0.8.5";
 const FILES = [
   "./",
   "index.html",
@@ -97,6 +97,9 @@ self.addEventListener("fetch", (e) => {
         await caches.delete("kerckhoffs-partage");
         const c = await caches.open("kerckhoffs-partage");
         let i = 0;
+        const texte = [fd.get("titre"), fd.get("texte"), fd.get("lien")].filter((t) => typeof t === "string" && t.trim()).join("\n");
+        if (texte) await c.put(new URL("partage/" + i++, self.registration.scope).href,
+          new Response(new Blob([texte], { type: "text/plain" }), { headers: { "content-type": "text/plain", "x-nom": "texte%20partag%C3%A9" } }));
         for (const f of fd.getAll("fichiers")) {
           if (!f || typeof f === "string" || !f.size) continue;
           await c.put(new URL("partage/" + i++, self.registration.scope).href,

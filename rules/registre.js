@@ -42,7 +42,7 @@
           if (lien) enchainees.push({ etiquette: e, mot: mot, debutEtiquette: i, suite: j + lien[0].length });
           if (!deuxPoints && !e.sansDeuxPoints) continue;            // « Nom : » oui, « le nom de » non
           var debut = j + apres[0].length;
-          trouves.push({ etiquette: e, mot: mot, debutEtiquette: i, debut: debut });
+          trouves.push({ etiquette: e, mot: mot, debutEtiquette: i, debut: debut, deuxPoints: deuxPoints });
         }
       });
     });
@@ -54,6 +54,8 @@
       var valeur = ligne.slice(t.debut, fin).replace(/[\s,;]+$/, "");
       // Une étiquette n'avale jamais une autre étiquette ni une indication de format (« | Heure de naissance », « (jour-mois-année) »).
       if (/^[|(\/;\[]/.test(valeur) || (K.ligneEtiquette && K.ligneEtiquette(valeur))) valeur = "";
+      // Sans deux-points (« né le 05.05.1985, domicilié… »), la valeur s'arrête à la première virgule ou au premier point final.
+      if (t.etiquette.sansDeuxPoints && !t.deuxPoints) valeur = valeur.split(/,\s|;\s|\.\s|\s[-–]\s/)[0].replace(/[\s,;.]+$/, "");
       if (t.etiquette.valeurNom) {
         var nom = valeur.match(/^(?:[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’\-]+(?:\s+|$)){1,4}/);
         valeur = nom ? nom[0].trim() : "";
