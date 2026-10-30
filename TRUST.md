@@ -29,11 +29,21 @@ That phone becomes a closed box: there is no physical way for it to send anythin
 
 ### Test 3: the author's signature
 
-Tap "Vérifier ma version" on the home screen. It shows a fingerprint such as `9A71-FC92-65A0-DC72`, which must match the one published for that release in [VERSIONS.md](VERSIONS.md) at the official address.
+When the app opens, tap "Vérifier avec un autre appareil" (check with another device), or on the home screen "Plus", then "Vérifier ma version". It shows a fingerprint such as `9A71-FC92-65A0-DC72`, which must match the one published for that release in [VERSIONS.md](VERSIONS.md) at the official address.
 
 From then on, that version never changes by itself, online or offline, until you delete it. If a new release exists, Kerckhoffs only tells you; you go and get it yourself, and it is checked file by file before it is offered. If anyone other than the author changed a single byte, for instance by taking over the repository, the update is refused and a red banner warns you.
 
 One honest limit: on the web, the browser has the last word on updates. For sensitive use (lawyers, doctors, public services), use the **frozen version**: one signed file, downloadable from the home screen, that opens with a double-click, works offline and never updates itself.
+
+### Every time it opens: the code checked, and your picture
+
+Every time it opens, before letting you in, Kerckhoffs recomputes the fingerprint of its own files, kept on your device, and compares it with the list signed by the author. It does this **without any connection**: the author's public key is written in its code, and the signature is stored with the app. If a single file was damaged or modified, the logo does not open and a red message warns you.
+
+One limit, stated plainly: code that checks itself cannot prove everything. Someone who replaced the whole app could also replace the checker, which would then wrongly say "checked". Three protections cover that case:
+
+- **Your picture.** On first launch you choose a small picture (and a word, if you like). It then appears under the logo every time the app opens. Your browser stores it in the drawer of Kerckhoffs' own address, which no other address can open: a fake app, necessarily somewhere else, cannot know it. **If you don't see your picture, it isn't your Kerckhoffs.** You are only asked again if you cleared your browser's data.
+- **The gatekeeper.** No new version installs unless you go and get it, and it is refused if it isn't signed by the author.
+- **A second device.** "Check with another device" shows the fingerprint and a QR code to the official list of releases. Scan it with another phone (a friend's, or a new device), check that the address that opens is the official one, and compare the two numbers. A compromised device cannot fool a second, healthy one.
 
 ### Test 4: who is the author of Kerckhoffs?
 
@@ -87,4 +97,4 @@ Kerckhoffs helps a lot. The final check is you.
 
 ---
 
-*Kerckhoffs is provided as is, under the Apache 2.0 license. Copy it, adapt it, share it freely.*
+*Kerckhoffs is provided as is, under the GNU AGPL 3.0 (or later) license. Copy it, adapt it, share it freely; a modified version offered to others publishes its source code too.*

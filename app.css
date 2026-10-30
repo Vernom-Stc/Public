@@ -185,8 +185,8 @@ input[type=text],select{
 .cerbere{max-height:60vh;max-height:60dvh}
 .cerbere p{margin:0}
 .cerbere-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-.cerbere-item{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}
-.cerbere-voir{flex:1;min-width:0;display:grid;gap:2px;text-align:left;background:none;border:0;color:var(--ink);font:inherit;cursor:pointer;padding:2px}
+.cerbere-item{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}
+.cerbere-voir{flex:1 1 180px;min-width:0;display:grid;gap:2px;text-align:left;background:none;border:0;color:var(--ink);font:inherit;cursor:pointer;padding:2px}
 .cerbere-voir strong{font-size:.88rem}
 .cerbere-voir span{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
 .cerbere-act{display:flex;gap:6px;flex:none}
@@ -446,3 +446,41 @@ details.group:not([open]){gap:0}
 /* Barre du rectangle : « Plus… » ouvre les options rares */
 .sel-plus{display:contents}
 .sel-plus[hidden]{display:none}
+
+/* ---- ouverture : le logo, la vérification du code, votre image ---- */
+.ouverture{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:max(24px,env(safe-area-inset-top,0px)) 16px max(24px,env(safe-area-inset-bottom,0px));background:var(--sheet);text-align:center}
+.ouverture-logo{width:168px;height:168px;border-radius:50%;border:1px solid var(--line);background:#fff;display:grid;place-items:center;
+  box-shadow:0 10px 30px rgba(20,32,43,.14),0 2px 6px rgba(20,32,43,.08);cursor:pointer;padding:0;transition:transform .15s}
+.ouverture-logo img{width:118px;height:118px;border-radius:24px}
+.ouverture-logo:disabled{cursor:default;opacity:.92}
+.ouverture-logo:not(:disabled):active{transform:scale(.97)}
+.ouverture-statut{margin:0;font:600 .95rem var(--ui);color:var(--muted)}
+.ouverture-statut.ok{color:var(--ok)}
+.ouverture-statut.ko{color:#b3141a}
+.ouverture-statut.attention{color:var(--warn)}
+.ouverture-signe{margin:0;font-size:1.6rem;line-height:1.2}
+.ouverture-signe .mot{display:block;font:600 1rem var(--ui);color:var(--ink);margin-top:2px}
+.ouverture-aide{margin:0;color:var(--muted);font-size:.9rem}
+.ouverture-lien{font-size:.85rem}
+.signe-choix{max-width:520px;display:grid;gap:10px;text-align:left;margin-top:8px}
+.signe-choix h2{margin:0;font-size:1.25rem;text-align:center}
+.signe-choix p{margin:0}
+.signe-grille{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.signe-grille button{font-size:1.7rem;min-height:54px;border-radius:12px;border:2px solid var(--line);background:var(--sheet);cursor:pointer;padding:0}
+.signe-grille button[aria-checked="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.signe-choix input{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--sheet);color:var(--ink)}
+@media (max-width:420px){.signe-grille{grid-template-columns:repeat(4,1fr)}}
+
+/* ---- accueil épuré ---- */
+.accueil .choices{margin-top:18px}
+.home-plus{border-top:1px solid var(--line);padding-top:8px}
+.home-plus > summary{cursor:pointer;color:var(--muted);font-weight:600;padding:6px 0}
+.home-plus[open]{display:grid;gap:14px}
+
+/* ---- plusieurs documents, cadre ---- */
+.ajout-doc{background:rgba(255,255,255,.92)}
+.meme-forme{grid-column:1/-1;font-size:.88rem}
+.cadrebar{background:#fff7e6;color:#4a3000;border:1px solid #e0a356;border-radius:10px;padding:10px;display:grid;gap:8px;pointer-events:auto;max-width:520px}
+.cadrebar p{margin:0;font-size:.92rem}
+.cam-cadre{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}

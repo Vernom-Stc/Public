@@ -15,8 +15,32 @@
 </head>
 <body>
 
+<!-- ============ OUVERTURE : le logo, la vérification du code (sans connexion) et votre image de reconnaissance ============ -->
+<main id="ouverture" class="ouverture">
+  <button class="ouverture-logo" id="ouvLogo" type="button" disabled aria-label="Entrer dans Kerckhoffs">
+    <img src="icons/icon.svg" alt="" width="132" height="132">
+  </button>
+  <p class="ouverture-statut" id="ouvStatut" role="status">Vérification du code…</p>
+  <p class="ouverture-signe" id="ouvSigne" hidden></p>
+  <p class="ouverture-aide" id="ouvAide" hidden>Touchez le logo pour entrer.</p>
+  <button class="link ouverture-lien" id="ouvAutre" type="button" hidden>Vérifier avec un autre appareil</button>
+
+  <!-- Premier lancement : choisir son image de reconnaissance -->
+  <section class="signe-choix" id="signeChoix" hidden aria-label="Choisissez votre image">
+    <h2>Choisissez votre image</h2>
+    <p>Elle apparaîtra à chaque ouverture, sous le logo. C'est votre signe que vous êtes bien dans <em>votre</em> Kerckhoffs.</p>
+    <p>Une fausse application pourrait copier l'écran, mais jamais votre image : elle reste sur cet appareil, et vous seul la connaissez.</p>
+    <p><strong>Si un jour vous ne voyez pas votre image, ce n'est pas votre Kerckhoffs. Ne l'utilisez pas.</strong></p>
+    <div class="signe-grille" id="signeGrille" role="radiogroup" aria-label="Images"></div>
+    <label for="signeMot">Un mot à ajouter, si vous voulez</label>
+    <input type="text" id="signeMot" maxlength="20" autocomplete="off" spellcheck="false" placeholder="ex. Pivoine">
+    <button class="btn primary" id="signeOk" type="button" disabled>C'est mon image</button>
+    <p class="hint">Oublié votre image ? Effacez les données de Kerckhoffs dans votre navigateur, puis rouvrez-le pour en choisir une nouvelle.</p>
+  </section>
+</main>
+
 <!-- ============ ACCUEIL ============ -->
-<main id="home" class="screen">
+<main id="home" class="screen accueil" hidden>
   <header class="brand">
     <img src="icons/icon.svg" alt="" class="logo" width="44" height="44">
     <div>
@@ -26,14 +50,17 @@
   </header>
 
   <div class="choices">
-    <button class="btn primary big" id="goCam" type="button">Photographier un document</button>
-    <button class="btn big" id="goImport" type="button">Importer un document<span class="sous-btn">photo déjà prise, image ou PDF</span></button>
-    <div class="choices-pc" id="choixPC" hidden>
-      <button class="btn" id="goColler" type="button">Coller une capture<span class="sous-btn">Ctrl+V</span></button>
-      <button class="btn" id="goCapture" type="button">Capturer l'écran<span class="sous-btn">une fenêtre ou un onglet</span></button>
-    </div>
+    <button class="btn primary big" id="goCam" type="button">Prendre une photo</button>
+    <button class="btn big" id="goImport" type="button">Importer un document<span class="sous-btn" id="importSous">image ou PDF · ou glissez-le ici</span></button>
   </div>
-  <p class="hint">Kerckhoffs repère les noms et les numéros tout seul. Vous relisez, vous complétez au doigt, puis vous envoyez. Sur un ordinateur, vous pouvez aussi glisser un fichier sur cette page.</p>
+
+  <details class="home-plus" id="homePlus">
+  <summary>Plus</summary>
+  <div class="choices-pc" id="choixPC" hidden>
+    <button class="btn" id="goColler" type="button">Coller une capture<span class="sous-btn">Ctrl+V</span></button>
+    <button class="btn" id="goCapture" type="button">Capturer l'écran<span class="sous-btn">une fenêtre ou un onglet</span></button>
+  </div>
+  <p class="hint">Kerckhoffs repère les noms et les numéros tout seul. Vous relisez, vous complétez au doigt, puis vous envoyez.</p>
 
   <p class="home-links">
     <button class="link" id="goDemo" type="button">Essayer avec un document d'exemple</button>
@@ -55,9 +82,10 @@
     <p class="hint">Kerckhoffs n'existe sur aucun store : sa seule adresse est celle de cette page. Ouvrez-la dans votre navigateur, pas depuis une autre application.</p>
     <p class="home-links"><button class="link" id="openVerif" type="button">Vérifier ma version</button></p>
     <p class="home-links"><button class="link" id="chercherMaj" type="button">Chercher une nouvelle version</button></p>
-    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.8.7.html" download>Version figée, pour les usages sensibles</a></p>
+    <p class="home-links"><a class="link" id="lienFige" href="telecharger/kerckhoffs-0.8.8.html" download>Version figée, pour les usages sensibles</a></p>
   </details>
-  <p class="fineprint">Version 0.8.7 · Logiciel libre, licence Apache 2.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  <p class="fineprint">Version 0.8.8 · Logiciel libre, licence AGPL 3.0. Fourni tel quel : relisez toujours le résultat avant de l'envoyer.</p>
+  </details>
 </main>
 
 <!-- ============ ESPACE DE TRAVAIL : la feuille en plein écran, quatre boutons aux quatre coins ============ -->
@@ -72,6 +100,13 @@
       <p class="tampon-note" id="tamponNote" hidden>Ce filigrane disparaît quand vous validez le document, au moment de l'envoyer.</p>
       <div class="mode-chip" id="modeChip" hidden><span id="modeTexte"></span><button class="btn small" id="modeFin" type="button">Terminé</button></div>
       <div class="pages" id="pages" hidden></div>
+      <div class="cadrebar" id="cadrebar" hidden role="alert">
+        <p id="cadreTexte">Le cadre n'est pas efficace pour ce document. Reprenez la photo en essayant de calquer le cadre, ou désactivez le cadre.</p>
+        <div class="cerbere-act">
+          <button class="btn small primary" id="cadreReprendre" type="button">Reprendre la photo</button>
+          <button class="btn small" id="cadreDesactiver" type="button">Désactiver le cadre</button>
+        </div>
+      </div>
       <div class="trouves" id="trouves" hidden role="status">
         <button class="btn small" id="trouvesPrec" type="button" aria-label="Élément précédent">‹</button>
         <span id="trouvesTexte"></span>
@@ -81,6 +116,7 @@
       <div class="pile-boutons">
         <button class="style-chip" id="styleChip" type="button" hidden></button>
         <button class="fit" id="fit" type="button" hidden>Ajuster</button>
+        <button class="btn small ajout-doc" id="ajoutDoc" type="button" hidden>＋ Document</button>
         <button class="btn small chercher-ici" id="chercherIci" type="button" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg> Rechercher ici</button>
       </div>
     </div>
@@ -126,6 +162,8 @@
       <button class="btn small" type="button" data-etiq="NUMERO">un numéro ou code</button>
       <button class="btn small" type="button" id="etiqAutre">autre…</button>
       <button class="btn small" type="button" id="etiqRenommer">Renommer</button>
+      <button class="btn small" type="button" id="etiqRelier">Relier…</button>
+      <button class="btn small" type="button" id="etiqDetacher" hidden>Détacher</button>
       <button class="btn small" type="button" id="etiqVisible">Rendre visible</button>
       <button class="btn small" id="etiqCancel" type="button" aria-label="Fermer">✕</button>
       <span class="etiq-saisie" id="etiqSaisie" hidden>
@@ -172,6 +210,7 @@
   <div class="camview" id="camView" hidden>
     <div class="cam-stage">
       <video id="camVideo" playsinline muted autoplay></video>
+      <canvas class="cam-cadre" id="camCadre" hidden aria-hidden="true"></canvas>
       <span class="cam-focus" id="camFocus" hidden></span>
       <p class="cam-tip">Touchez le document pour faire la mise au point. Tenez le téléphone à 20–30 cm, bien parallèle à la feuille.</p>
     </div>
@@ -208,8 +247,9 @@
       <button class="outil" id="mChercher" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg><span>Rechercher ici</span><small>relire de près la zone affichée</small></button>
       <button class="outil" id="mGomme" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-11 11H5l-3-3L16 3zM9 10l5 5M10 21h11"/></svg><span>Gomme</span><small>faire réapparaître une donnée</small></button>
       <button class="outil" id="mRecadrer" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/></svg><span>Recadrer</span><small>ne garder que la feuille</small></button>
-      <button class="outil" id="btnCam" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Ajouter une photo</span><small>nouvelle page</small></button>
+      <button class="outil" id="btnCam" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Ajouter une photo</span><small>nouveau document</small></button>
       <button class="outil" id="btnFile" type="button"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6v18h12V7zM14 3v4h4M12 11v6M9 14l3 3 3-3"/></svg><span>Importer</span><small>image ou PDF</small></button>
+      <label class="check meme-forme" id="memeFormeBloc" hidden><input type="checkbox" id="optMemeForme"> Même forme que le précédent : le cadre et les zones effacées suivent sur le document ajouté</label>
       <button class="outil" id="mColler" type="button" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9zM7 5H5v16h14V5h-2"/></svg><span>Coller une capture</span><small>Ctrl+V</small></button>
       <button class="outil" id="mCapture" type="button" hidden><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg><span>Capturer l'écran</span><small>une fenêtre ou un onglet</small></button>
     </div>
@@ -259,6 +299,8 @@
         <label class="check"><input type="radio" name="style" value="noir" id="styleNoir"> Noir, partout</label>
         <p class="hint">Dans tous les cas, il n'y a plus rien dessous : le document envoyé est une image neuve.</p>
       </fieldset>
+      <label for="langueDoc">Langue des textes ajoutés au document envoyé (étiquettes, mention, consigne pour l'IA)</label>
+      <select id="langueDoc"><option value="fr">Français</option><option value="en">English</option></select>
       <label class="check"><input type="checkbox" id="optGaucher"> Je suis gaucher : boutons en miroir</label>
       <label class="check" id="camDirecteBloc"><input type="checkbox" id="optCamDirecte" checked> Ouvrir directement l'appareil photo</label>
       <label class="check"><input type="checkbox" id="optAnim" checked> Animations</label>

@@ -29,11 +29,21 @@ Ce téléphone devient une machine fermée : aucun moyen physique d'envoyer quoi
 
 ### Test 3 : la signature de l'auteur
 
-Touchez « Vérifier ma version » sur l'accueil. L'écran affiche un numéro de référence, par exemple `9A71-FC92-65A0-DC72`. Il doit être identique à celui publié pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
+À l'ouverture, touchez « Vérifier avec un autre appareil » (ou, sur l'accueil, « Plus », puis « Vérifier ma version »). L'écran affiche un numéro de référence, par exemple `9A71-FC92-65A0-DC72`. Il doit être identique à celui publié pour cette version dans [VERSIONS.md](VERSIONS.md), à l'adresse officielle.
 
 Cette version ne changera plus jamais toute seule, avec ou sans internet, tant que vous ne l'effacez pas. Si une nouvelle version existe, Kerckhoffs vous le signale ; c'est vous qui allez la chercher. Elle est alors vérifiée fichier par fichier avant de vous être proposée. Si quelqu'un d'autre que l'auteur a changé un seul octet, par exemple en prenant le contrôle du dépôt, la mise à jour est refusée et un bandeau rouge vous prévient.
 
 Une limite, dite franchement : sur le web, c'est le navigateur qui a le dernier mot sur les mises à jour. Pour les usages sensibles (avocats, médecins, administrations), utilisez donc la **version figée** : un seul fichier signé, à télécharger depuis l'accueil, qui s'ouvre d'un double-clic, fonctionne sans internet et ne se met jamais à jour tout seul.
+
+### À chaque ouverture : le code vérifié, et votre image
+
+À chaque ouverture, avant de vous laisser entrer, Kerckhoffs recalcule l'empreinte de ses propres fichiers, gardés sur votre appareil, et la compare à la liste signée par l'auteur. Il le fait **sans aucune connexion** : la clé publique de l'auteur est inscrite dans son code, et la signature est gardée avec l'application. Si un seul fichier a été abîmé ou modifié, le logo ne s'ouvre pas et un message rouge vous prévient.
+
+Une limite, dite franchement : un code qui se vérifie lui-même ne peut pas tout prouver. Quelqu'un qui remplacerait toute l'application pourrait aussi remplacer le vérificateur, qui dirait alors « vérifié » à tort. Trois protections couvrent ce cas :
+
+- **Votre image.** Au premier lancement, vous choisissez une petite image (et un mot, si vous voulez). Elle s'affiche ensuite sous le logo, à chaque ouverture. Votre navigateur la range dans le tiroir de l'adresse de Kerckhoffs, qu'aucune autre adresse ne peut ouvrir : une fausse application, forcément ailleurs, ne peut pas la connaître. **Si vous ne voyez pas votre image, ce n'est pas votre Kerckhoffs.** Elle ne vous est redemandée que si vous avez effacé les données de votre navigateur.
+- **Le gardien.** Aucune nouvelle version ne s'installe sans que vous alliez la chercher, et elle est refusée si elle n'est pas signée par l'auteur.
+- **Un deuxième appareil.** « Vérifier avec un autre appareil » montre le numéro de référence et un QR code vers la liste officielle des versions. Scannez-le avec un autre téléphone (celui d'un proche, ou un appareil neuf), vérifiez que l'adresse ouverte est bien l'adresse officielle, et comparez les deux numéros. Un appareil corrompu ne peut pas tromper un autre appareil sain.
 
 ### Test 4 : qui est l'auteur de Kerckhoffs ?
 
@@ -87,4 +97,4 @@ Kerckhoffs vous aide beaucoup. La dernière vérification, c'est vous.
 
 ---
 
-*Kerckhoffs est fourni tel quel, sous licence Apache 2.0. Copiez-le, adaptez-le, partagez-le librement.*
+*Kerckhoffs est fourni tel quel, sous licence GNU AGPL 3.0 ou ultérieure. Copiez-le, adaptez-le, partagez-le librement ; une version modifiée proposée à d'autres publie aussi son code.*

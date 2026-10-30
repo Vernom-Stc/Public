@@ -8,7 +8,7 @@ Kerckhoffs efface les informations personnelles d'une photo ou d'un document ava
 
 ## Comment l'utiliser
 
-**Photographiez un document**, ou **importez-le** : une photo déjà prise, une image ou un PDF, une ou plusieurs pages. Kerckhoffs repère tout seul les noms et les numéros. Un nom devient `[PERSONNE_1]`, un numéro AVS devient `[AVS_1]`. Vous relisez, vous complétez au doigt (pinceau ou rectangle), puis vous envoyez en image, en PDF, en image allégée ou en texte seul. Vous lisez la réponse de l'IA avec votre original sous les yeux : vous savez qui est qui.
+**Photographiez un document**, ou **importez-le** : une photo déjà prise, une image ou un PDF, une ou plusieurs pages. Kerckhoffs repère tout seul les noms et les numéros. Un nom devient `[PERSONNE_A]`, un numéro AVS devient `[AVS_A]`. Kerckhoffs ne relie rien de lui-même : chaque endroit masqué a sa propre lettre, même si le texte est écrit pareil. C'est vous qui donnez la même lettre à plusieurs endroits (« Tous les pareils », ou « Relier… »), et le document le dit. Vous relisez, vous complétez au doigt (pinceau ou rectangle), puis vous envoyez en image et texte (le mieux pour l'IA, avec une courte consigne en tête du texte), en image seule, en PDF, en image allégée ou en texte seul. Les textes ajoutés au document existent en français et en anglais (Réglages). Vous lisez la réponse de l'IA avec votre original sous les yeux : vous savez qui est qui.
 
 Tant que le document n'est pas validé, l'écran affiche en filigrane « ORIGINAL · NON MASQUÉ · NE PAS ENVOYER ».
 
@@ -24,7 +24,7 @@ Après la validation, une courte animation montre les zones masquées qui tomben
 
 **Le mode strict**, pour les professionnels, rend cette vérification obligatoire : chaque point doit être traité, puis un aperçu final montre exactement ce qui va partir.
 
-**La mention en bas du document.** Chaque document envoyé porte en bas une petite bande : « Masqué par l'utilisateur, avec Kerckhoffs », avec « effacé couleur papier » si c'est le cas, et « vérifié point par point » ou « non vérifié point par point » selon le niveau. Au niveau Strict, on peut la retirer. Chaque zone effacée sans étiquette porte de toute façon une petite marque rouge « kerckhoffs.app », qui fait partie de l'image. Elle ne contient ni date, ni appareil, ni numéro. La mention n'est pas une garantie de Kerckhoffs : c'est la personne qui envoie qui relit et valide ce qui part.
+**La mention en bas du document.** Chaque document envoyé porte en bas une petite bande : « Masqué par l'utilisateur, avec Kerckhoffs », avec « effacé couleur papier » si c'est le cas, et « vérifié point par point » ou « non vérifié point par point » selon le niveau. Au niveau Strict, on peut la retirer. Chaque zone effacée sans étiquette porte de toute façon une petite marque rouge « kerckhoffs.app », qui fait partie de l'image. Elle ne contient ni date, ni appareil, ni numéro. Sur une petite zone, c'est le logo avec « :ON ». Quand Kerckhoffs n'arrive pas à lire une page (photo trop floue, écriture qu'il ne connaît pas), il passe en **K:OFF** : la détection automatique se coupe, l'effacement au doigt reste, la page porte un léger filigrane « K:OFF » et une ligne qui l'explique. La mention n'est pas une garantie de Kerckhoffs : c'est la personne qui envoie qui relit et valide ce qui part.
 
 ## Pourquoi vous pouvez lui faire confiance
 
@@ -54,7 +54,7 @@ puis ouvrez `http://localhost:8000`.
 
 ## Adapter Kerckhoffs
 
-Le projet est fourni **tel quel**. Il n'y a pas d'engagement de maintenance. Copiez-le, adaptez-le à votre pays, à votre métier ou à votre organisation, y compris dans une version fermée : la licence Apache 2.0 le permet.
+Le projet est fourni **tel quel**. Il n'y a pas d'engagement de maintenance. Copiez-le, adaptez-le à votre pays, à votre métier ou à votre organisation : la licence AGPL le permet, à une condition. Si vous proposez une version modifiée à d'autres personnes, y compris par un site web, vous publiez aussi son code, sous la même licence. Kerckhoffs reste ainsi ouvert, et personne ne peut en faire une version fermée.
 
 - **Ajouter votre pays** : chaque pays a son fichier dans `rules/pays/` (la Suisse : `rules/pays/ch.js`). Copiez `rules/pays/_modele.js`, remplissez-le, et vérifiez avec `node rules/tester.js`. Tout est expliqué dans [rules/LISEZMOI.md](rules/LISEZMOI.md).
 - La langue de lecture des textes est le français (`vendor/tesseract/lang/fra.traineddata.gz`). D'autres langues sont disponibles dans les paquets `@tesseract.js-data`.
@@ -66,7 +66,7 @@ Si Kerckhoffs vous est utile, un don en Bitcoin ou par Lightning fait plaisir. *
 
 ## Licence et bibliothèques
 
-Kerckhoffs est distribué sous licence [Apache 2.0](LICENSE). Il utilise :
+Kerckhoffs est distribué sous licence [GNU AGPL 3.0 ou ultérieure](LICENSE). Il utilise :
 
 - [Tesseract.js](https://github.com/naptha/tesseract.js) pour lire le texte (Apache 2.0)
 - [PDF.js](https://github.com/mozilla/pdf.js) pour ouvrir les PDF (Apache 2.0)
@@ -80,4 +80,4 @@ Le nom rend hommage à Auguste Kerckhoffs, qui écrivait en 1883 dans *La Crypto
 
 ## English summary
 
-Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Take a photo or import a document (image or PDF, one or more pages): names and numbers are detected automatically, you finish with your finger, then export as image, PDF, lightened image or plain text. A check before sending flags what could still identify someone; strict mode, for professionals, makes it mandatory. Exports carry a small footer, “Masqué par l'utilisateur, avec Kerckhoffs” (masked by the user, with Kerckhoffs), stating whether strict mode was used; only strict-mode documents may omit it. Every area erased without a label also carries a small red “kerckhoffs.app” mark, part of the image itself. The footer is not a guarantee: the person sending the document checks and approves it. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the Apache 2.0 license; copy and adapt it freely. To add your country's rules, see [rules/LISEZMOI.md](rules/LISEZMOI.md).
+Kerckhoffs hides personal data in a photo or document before you send it to an AI. Everything happens on your device; nothing is sent anywhere. Take a photo or import a document (image or PDF, one or more pages): names and numbers are detected automatically, you finish with your finger, then export as image, PDF, lightened image or plain text. A check before sending flags what could still identify someone; strict mode, for professionals, makes it mandatory. Exports carry a small footer, “Masqué par l'utilisateur, avec Kerckhoffs” (masked by the user, with Kerckhoffs), stating whether strict mode was used; only strict-mode documents may omit it. Every area erased without a label also carries a small red “kerckhoffs.app” mark, part of the image itself. The footer is not a guarantee: the person sending the document checks and approves it. Try airplane mode: it all still works. See [TRUST.md](TRUST.md). Provided as is under the GNU AGPL 3.0 (or later) license: copy and adapt it freely; if you offer a modified version to others, including through a website, you publish its source code under the same license. To add your country's rules, see [rules/LISEZMOI.md](rules/LISEZMOI.md).
