@@ -55,7 +55,7 @@
     leaving: false,
   };
   // Pour les tests sur l'ordinateur du développeur uniquement (jamais sur l'adresse publique).
-  if (location.hostname === "localhost") { window.__kerckhoffsTest = S; window.__kerckhoffsAuDessus = (p) => valeursAuDessus(p); window.__kerckhoffsReperes = (p) => reperesDe(p); }
+  if (location.hostname === "localhost") { window.__kerckhoffsTest = S; window.__kerckhoffsAuDessus = (p) => valeursAuDessus(p); window.__kerckhoffsReperes = (p) => reperesDe(p); window.__kerckhoffsCodes = (p) => codesBarresForme(p); }
   const cv = $("cv");
   const ctx = cv.getContext("2d");
   const page = () => S.pages[S.cur];
@@ -81,6 +81,7 @@
       kOff: "K:OFF · détection automatique désactivée, effacé à la main · kerckhoffs.app",
       page: "Page",
       consigne: "Document masqué avec Kerckhoffs. Les éléments entre crochets remplacent des données personnelles. Une même étiquette désigne toujours la même chose ; deux étiquettes différentes peuvent aussi désigner la même chose, car Kerckhoffs ne relie rien de lui-même. Merci de garder ces étiquettes dans votre réponse.",
+      texteLu: "Le texte a été lu automatiquement sur l'image : en cas de différence, l'image fait foi. [?] marque un mot mal lu.",
       consigneGroupes: "Les regroupements (même lettre) ont été faits par l'utilisateur, pas par Kerckhoffs.",
     },
     en: {
@@ -93,6 +94,7 @@
       kOff: "K:OFF · automatic detection turned off, masked by hand · kerckhoffs.app",
       page: "Page",
       consigne: "Document masked with Kerckhoffs. Items in square brackets replace personal data. The same label always refers to the same thing; two different labels may also refer to the same thing, because Kerckhoffs never links items on its own. Please keep these labels in your answer.",
+      texteLu: "The text was read automatically from the image: if they differ, the image is right. [?] marks a word that could not be read reliably.",
       consigneGroupes: "Items sharing a letter were grouped by the user, not by Kerckhoffs.",
     },
   };
@@ -2074,17 +2076,33 @@
     });
     return out;
   }
+  // Les lettres suivent l'ordre de lecture, et ne comptent que ce qui est réellement masqué :
+  // d'abord tout ce qui porte une étiquette (zones actives, rectangles nommés), page par page, de haut en bas puis de gauche à droite ;
+  // ensuite seulement ce qui a été rendu visible (pour garder sa lettre s'il est masqué de nouveau).
   function attribuerJetons() {
     S.tokens = new Map(); S.counters = {};
     S.sansEtiquette = S.sansEtiquette || new Set();
+    const masque = `[${tr("masque")}]`, aNommer = [], ensuite = [];
     S.pages.forEach((p, pi) => {
+      const ici = [];
       p.boxes.forEach((b) => {
         b.occ = occBox(b, pi);
         b.sansEtiquette = S.sansEtiquette.has(b.occ);
-        b.token = b.sansEtiquette ? `[${tr("masque")}]` : tokenFor(lienDe(b.occ), b.type || String(b.key).split("|")[0], b.value);
+        b.token = b.sansEtiquette ? masque : "";
+        if (b.sansEtiquette) return;
+        if (b.active && !String(b.key).startsWith("ZONE|")) ici.push({ y: b.y, x: b.x, box: b }); else ensuite.push(b);
       });
-      p.strokes.forEach((st) => { if (st.ref) { st.ref.occ = occTrait(st, pi); st.ref.sansEtiquette = S.sansEtiquette.has(st.ref.occ); } });
+      p.strokes.forEach((st) => {
+        if (!st.ref) return;
+        st.ref.occ = occTrait(st, pi); st.ref.sansEtiquette = S.sansEtiquette.has(st.ref.occ);
+        if (!st.ref.sansEtiquette) ici.push({ y: st.y, x: st.x, st });
+      });
+      // Même ligne si le haut est à moins d'une demi-hauteur de ligne : alors de gauche à droite.
+      ici.sort((a, b) => (Math.abs(a.y - b.y) < 12 ? a.x - b.x : a.y - b.y));
+      aNommer.push(...ici);
     });
+    aNommer.forEach((e) => { if (e.box) e.box.token = tokenFor(lienDe(e.box.occ), e.box.type || String(e.box.key).split("|")[0], e.box.value); else jetonTrait(e.st); });
+    ensuite.forEach((b) => { b.token = tokenFor(lienDe(b.occ), b.type || String(b.key).split("|")[0], b.value); });
   }
   // L'étiquette d'un rectangle nommé (« C'est : un nom ») : la sienne, ou celle de son groupe.
   const jetonTrait = (st) => (st.ref.sansEtiquette ? `[${tr("masque")}]` : tokenFor(lienDe(st.ref.occ || st.ref.key), st.ref.type, st.ref.value));
@@ -2550,7 +2568,9 @@
     return o;
   }
   // La consigne pour l'IA, en tête du texte envoyé.
-  const consigne = () => tr("consigne") + (regroupementsFaits() ? " " + tr("consigneGroupes") : "");
+  // « L'image fait foi » : seulement quand le texte a été lu sur une image (pas pour un texte collé), et que l'image part aussi.
+  const consigne = () => tr("consigne") + (regroupementsFaits() ? " " + tr("consigneGroupes") : "") +
+    (S.pages.some((p) => !p.texte) ? " " + tr("texteLu") : "");
   function finalCanvas(p, masked) {
     const c = document.createElement("canvas");
     c.width = p.img.width; c.height = p.img.height;
@@ -2606,6 +2626,26 @@
     };
   }
 
+  /* Le texte envoyé ne garde que ce qui a été lu avec assurance. Sur un fond gris ou une photo un peu floue, la lecture
+   * fabrique parfois des mots ou déforme un montant : une IA qui calculerait avec ce texte se tromperait sans le savoir.
+   * Un mot douteux devient [?] ; un débris (« Bi », « e)) ») disparaît. L'image, elle, reste exacte et fait foi. */
+  const SEUIL_LETTRES = 55, SEUIL_CHIFFRES = 70;
+  // Les colonnes de montants avec centimes (« 242.50 ») : un nombre sans séparateur aligné dessus (« 77045 ») a perdu son point.
+  const MONTANT = /^-?[\d'’]*\d[.,]\d{2}$/;
+  function colonnesMontants(p) {
+    return (p.lines || []).flatMap((l) => l.words).filter((w) => (w.conf == null || w.conf >= 70) && MONTANT.test(w.text)).map((w) => w.bbox.x1);
+  }
+  function motSur(w, montants, largeur) {
+    const t = w.text, signes = t.replace(/[^A-Za-zÀ-ÿ0-9]/g, ""), chiffres = /\d/.test(t);
+    if (/^[:;–-]$/.test(t)) return t; // la ponctuation qui sépare une étiquette de sa valeur
+    // Un débris : deux signes au plus, entourés de ponctuation (« ge)) », « == ») ; une virgule ou un point final ne compte pas.
+    if (signes.length <= 2 && /[^A-Za-zÀ-ÿ0-9]/.test(t.replace(/[.,:;]$/, ""))) return null;
+    if (!signes.length) return null;
+    if (/^\d{2,}$/.test(t) && montants.some((x1) => Math.abs(x1 - w.bbox.x1) < largeur * 0.03)) return "[?]";
+    if (w.conf == null || w.conf >= (chiffres ? SEUIL_CHIFFRES : SEUIL_LETTRES)) return t;
+    if (signes.length <= 2 && !chiffres) return null;
+    return "[?]";
+  }
   async function buildText(masked) {
     for (let i = 0; i < S.pages.length; i++) {
       if (!S.pages[i].lines) { setStatus(`Lecture de la page ${i + 1}…`); await ocr(S.pages[i]); }
@@ -2615,22 +2655,31 @@
       const out = S.pages.length > 1 ? [`--- ${tr("page")} ${pi + 1} ---`] : [];
       if (p.kOff && masked) { out.push("[K:OFF]"); return out.join("\n"); } // illisible : rien de sûr à transmettre en texte
       const dans = (r, x, y) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+      // Une zone masquée (rectangle ou zone détectée) ne donne son étiquette qu'une fois, même si elle couvre plusieurs lignes.
+      const deja = new Set(), montants = p.texte ? [] : colonnesMontants(p);
       for (const line of p.lines) {
-        const parts = [], done = new Set();
+        const parts = []; let chiffreDouteux = false;
         const pousser = (s) => { if (parts[parts.length - 1] !== s) parts.push(s); };
         for (const w of line.words) {
           if (masked) {
             const mx = (w.bbox.x0 + w.bbox.x1) / 2, my = (w.bbox.y0 + w.bbox.y1) / 2;
             const st = p.strokes.find((s) => (s.kind === "rect" && dans(s, mx, my)) || (s.etiq && s.etiq.rects.some((r) => dans(r, mx, my))));
-            if (st) { const e = st.ref || (st.etiq && !st.etiq.marque ? st.etiq : null); pousser(st.ref ? jetonTrait(st) : e ? tokenFor(e.key, e.type, e.value) : `[${tr("masque")}]`); continue; }
+            if (st) {
+              if (deja.has(st)) continue;
+              deja.add(st);
+              const e = st.ref || (st.etiq && !st.etiq.marque ? st.etiq : null);
+              pousser(st.ref ? jetonTrait(st) : e ? tokenFor(e.key, e.type, e.value) : `[${tr("masque")}]`); continue;
+            }
           }
           const b = masked && p.boxes.find((bx) => bx.active && bx.words.includes(w));
-          if (b) { if (!done.has(b)) { parts.push(b.token); done.add(b); } continue; }
+          if (b) { if (!deja.has(b)) { pousser(b.token); deja.add(b); } continue; }
           const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
           if (hit(cx, cy)) { pousser(`[${tr("masque")}]`); continue; }
-          parts.push(w.text);
+          const m = p.texte ? w.text : motSur(w, montants, p.img.width);
+          if (m === "[?]") { pousser("[?]"); if (/\d/.test(w.text)) chiffreDouteux = true; } else if (m) parts.push(m);
         }
-        if (parts.length) out.push(parts.join(" "));
+        // Une ligne faite seulement de [?] n'apprend rien, sauf si c'était un nombre : l'IA sait alors qu'un montant est là, à lire sur l'image.
+        if (parts.length && (!parts.every((x) => x === "[?]") || chiffreDouteux)) out.push(parts.join(" "));
       }
       return out.join("\n");
     }).join("\n\n");
@@ -3294,6 +3343,15 @@
           });
         } catch (e) { /* pas de lecteur de codes sur cet appareil */ }
       }
+      // Tête 3 : un code-barres reconnu à sa forme (des barres verticales serrées), même sans lecteur de codes sur l'appareil.
+      try {
+        codesBarresForme(p).forEach((r) => {
+          if (items.some((it) => it.page === pi && it.label === "Code-barres ou code 2D" && it.rects.some((q) => q.x < r.x + r.w && r.x < q.x + q.w && q.y < r.y + r.h && r.y < q.y + q.h))) return;
+          let vus = 0, total = 0;
+          for (let gx = 0; gx <= 4; gx++) for (let gy = 0; gy <= 2; gy++) { total++; if (!cache(r.x + (r.w * gx) / 4, r.y + (r.h * gy) / 2)) vus++; }
+          if (vus / total > 0.3) ajouter({ tete: 3, label: "Code-barres ou code 2D", texte: "des barres verticales serrées, souvent un numéro de dossier", rects: [r] });
+        });
+      } catch (e) {}
       // Tête 4 : écriture que la lecture n'a pas su lire du tout
       try {
         zonesSansTexte(p, cache).forEach((r) => ajouter({ tete: 4, label: "Écriture non lue ici", texte: "texte trop petit, flou, ou manuscrit", rects: [r], nonLu: true }));
@@ -3331,6 +3389,45 @@
       items.push({ tete: 0, ...surPage(els), label: "Le même texte se trouve dans deux groupes différents", texte: [...m.keys()].join(" et "), groupe: els });
     }
     return items.sort((a, b) => a.tete - b.tete);
+  }
+  /* Un code-barres à sa forme : sur une copie de 1600 pixels de large au plus, des cases où l'encre change très souvent de gauche
+   * à droite (beaucoup de barres) ET reste identique de haut en bas (des barres, pas des lettres). Les cases voisines
+   * s'assemblent en un rectangle ; un rectangle assez large est signalé. */
+  function codesBarresForme(p) {
+    const W = Math.min(1600, p.img.width), k = p.img.width / W, H = Math.max(1, Math.round(p.img.height / k));
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const x = c.getContext("2d", { willReadFrequently: true }); x.drawImage(p.img, 0, 0, W, H);
+    const d = x.getImageData(0, 0, W, H).data, n = new Uint8Array(W * H);
+    const g = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+    const tri = Float32Array.from(g).sort(), fond = tri[Math.floor(tri.length * 0.6)];
+    for (let i = 0; i < W * H; i++) n[i] = g[i] < fond - 50 ? 1 : 0;
+    const CW = 40, CH = 4, cols = Math.floor(W / CW), rows = Math.floor((H - 12) / CH), marque = new Uint8Array(cols * rows);
+    for (let ry = 0; ry < rows; ry++) for (let cx = 0; cx < cols; cx++) {
+      const y = ry * CH, x0 = cx * CW;
+      let trans = 0, pareil = 0, encre = 0;
+      for (let xx = x0 + 1; xx < x0 + CW; xx++) if (n[y * W + xx] !== n[y * W + xx - 1]) trans++;
+      for (let xx = x0; xx < x0 + CW; xx++) { const a = n[y * W + xx]; encre += a; if (a === n[(y + 6) * W + xx] && a === n[(y + 12) * W + xx]) pareil++; }
+      if (trans >= 6 && pareil / CW >= 0.9 && encre >= CW * 0.2 && encre <= CW * 0.8) marque[ry * cols + cx] = 1;
+    }
+    // Assembler les cases marquées voisines
+    const vu = new Uint8Array(cols * rows), out = [];
+    for (let i = 0; i < marque.length; i++) {
+      if (!marque[i] || vu[i]) continue;
+      const pile = [i]; vu[i] = 1; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, nb = 0;
+      while (pile.length) {
+        const j = pile.pop(), cx = j % cols, ry = (j - cx) / cols; nb++;
+        x0 = Math.min(x0, cx); x1 = Math.max(x1, cx); y0 = Math.min(y0, ry); y1 = Math.max(y1, ry);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [3, 0], [-3, 0], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+          const a = cx + dx, b = ry + dy, q = b * cols + a;
+          if (a >= 0 && a < cols && b >= 0 && b < rows && marque[q] && !vu[q]) { vu[q] = 1; pile.push(q); }
+        }
+      }
+      const larg = (x1 - x0 + 1) * CW, haut = (y1 - y0 + 1) * CH + 12;
+      // Une marge autour : les barres du bord, moins régulières, et souvent le numéro imprimé juste dessous.
+      if (larg >= 120 && haut >= 18 && nb >= 6) { const mx = CW, my = haut * 0.6; out.push({ x: (x0 * CW - mx) * k, y: (y0 * CH - 6) * k, w: (larg + 2 * mx) * k, h: (haut + 6 + my) * k }); }
+    }
+    return out;
   }
   function allerVoir(it) { fermerCerbere(); montrer(it); setStatus("Corrigez le regroupement (toucher l'élément, puis Relier… ou Détacher), puis renvoyez.", true); }
 
@@ -3511,6 +3608,7 @@
 
   async function avecCerbere(action, sansEnvoi) {
     cerbereSansEnvoi = !!sansEnvoi; balayageInfo = "";
+    attribuerJetons(); render(); // les lettres définitives (A, B, C… dans l'ordre), avant le contrôle et l'aperçu
     // Sans masquage, ou document déjà validé et inchangé : on envoie tout de suite, sans contrôle ni animation.
     if (!$("optMask").checked || (cerbereOk === S.version && !strict)) { if (cerbereSansEnvoi) return action(); ouvrirApercu(action); return; }
     let attendu = false;
@@ -3758,7 +3856,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.8";
+  const VERSION_APP = "0.8.9";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";
