@@ -593,15 +593,76 @@
     p.strokes.forEach((st) => strokePath(c, st, couleurDe(st, p)));
     const aEcrire = [];
     p.boxes.forEach((b) => { b.etiquettes = aEcrire; drawBox(c, b, final, p); b.etiquettes = null; });
-    // Les étiquettes des mots effacés au doigt et des rectangles référencés passent en premier.
+    // Ce qui est effacé sans étiquette (le doigt, un rectangle « Masquer ») porte la marque rouge « kerckhoffs.app » :
+    // on voit qu'il y avait là une information, même en couleur papier. Taille fixe, découpée par la zone, comme un ticket à gratter.
+    p.strokes.forEach((st) => { if (!st.ref) marquer(c, p, st); });
+    // Les étiquettes des rectangles nommés passent en premier.
     const deja = [];
     p.strokes.forEach((st) => {
-      const e = st.etiq || st.ref;
+      const e = st.ref || (st.etiq && !st.etiq.marque ? st.etiq : null);
       if (!e) return;
       const token = tokenFor(e.key, e.type, e.value);
       ecrireEtiquette(c, token, st.etiq ? st.etiq.zone || unionDe(st.etiq.rects) : st, couleurDe(st, p), deja);
     });
     aEcrire.forEach(([token, r, fond]) => ecrireEtiquette(c, token, r, fond, deja));
+  }
+  const MARQUE = "kerckhoffs.app";
+  // Le logo (le K et sa serrure), pour les petites zones où l'adresse ne tiendrait pas.
+  const LOGO_K = new Path2D("M150.0 391.0 L150.8 395.2 L153.2 398.8 L156.8 401.2 L159.9 401.9 L212.1 401.9 L215.2 401.2 L218.8 398.8 L221.2 395.2 L222.0 391.0 L222.2 313.5 L223.8 309.6 L226.0 307.2 L229.7 305.1 L232.8 304.6 L236.0 305.0 L238.0 305.8 L241.5 308.6 L318.7 398.2 L321.1 400.2 L323.9 401.6 L327.0 402.0 L363.9 402.0 L366.1 401.8 L369.2 400.7 L372.5 397.9 L374.2 395.1 L374.9 391.9 L374.7 388.6 L372.9 384.7 L268.2 263.4 L266.3 260.6 L265.3 256.5 L265.9 252.4 L268.2 248.6 L372.9 127.3 L374.7 123.4 L374.8 119.0 L373.2 115.0 L371.0 112.6 L368.2 110.9 L363.9 110.0 L327.0 110.0 L323.9 110.4 L321.1 111.8 L318.7 113.8 L241.5 203.4 L238.0 206.2 L235.0 207.2 L232.8 207.4 L228.7 206.5 L226.0 204.8 L223.3 201.5 L222.1 197.5 L222.0 121.0 L221.2 116.8 L219.5 114.0 L217.1 111.9 L215.2 110.8 L211.0 110.0 L159.9 110.1 L155.8 111.3 L152.5 114.0 L150.8 116.8 L150.0 121.0 Z");
+  function dessinerLogo(c, x, yMilieu, h, fond) {
+    const k = h / 292; // le K mesure 292 unités de haut dans le dessin d'origine
+    c.save(); c.translate(x - 150 * k, yMilieu - h / 2 - 110 * k); c.scale(k, k);
+    c.fillStyle = "#d0021b"; c.fill(LOGO_K);
+    c.fillStyle = fond || "#fff"; c.beginPath(); c.arc(186, 240.4, 18, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.moveTo(177, 250); c.lineTo(195, 250); c.lineTo(201, 290); c.lineTo(171, 290); c.closePath(); c.fill();
+    c.restore();
+  }
+  const tailleMarque = (p) => Math.max(14, Math.round(Math.min(p.img.width, p.img.height * 0.75) / 55));
+  function marquer(c, p, st) {
+    const h = tailleMarque(p), fond = couleurDe(st, p);
+    c.save();
+    c.font = `700 ${h}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+    c.fillStyle = "#d0021b"; c.textBaseline = "middle";
+    const ecrire = (x, y) => c.fillText(MARQUE, x, y);
+    if (st.kind === "rect" || (st.etiq && st.surMots)) {
+      // Un mot déjà masqué par la détection garde son étiquette : pas de marque par-dessus.
+      const dejaMasque = (r) => p.boxes.some((b) => b.active && (b.rects || [b]).some((q) => r.x + r.w / 2 >= q.x && r.x + r.w / 2 <= q.x + q.w && r.y + r.h / 2 >= q.y && r.y + r.h / 2 <= q.y + q.h));
+      const rects = st.kind === "rect" ? [st] : st.etiq.rects.filter((r) => !dejaMasque(r));
+      // Une ligne de mots = une marque, qui commence au début de la ligne.
+      const lignes = [];
+      rects.forEach((r) => {
+        const l = lignes.find((x) => Math.abs((x.y + x.h / 2) - (r.y + r.h / 2)) < Math.min(x.h, r.h) * 0.5);
+        if (l) l.rects.push(r); else lignes.push({ y: r.y, h: r.h, rects: [r] });
+      });
+      const largeurTexte = c.measureText(MARQUE).width;
+      lignes.forEach((l) => {
+        c.save(); c.beginPath(); l.rects.forEach((r) => c.rect(r.x, r.y, r.w, r.h)); c.clip();
+        const u = unionDe(l.rects);
+        // Petite zone : le logo se découvre à la place de l'adresse.
+        if (u.w < largeurTexte * 0.55) dessinerLogo(c, u.x + Math.max(2, (u.w - h * 0.8) / 2), u.y + u.h / 2, Math.min(h, u.h * 0.9), fond);
+        else ecrire(u.x + h * 0.2, u.y + u.h / 2);
+        c.restore();
+      });
+    } else if (st.kind === "line" && st.pts.length) {
+      // Trait libre (signature, visage…) : la marque n'apparaît que là où le doigt est passé.
+      const xs = st.pts.map((q) => q[0]), ys = st.pts.map((q) => q[1]), m = st.w / 2 + 2;
+      const bx = Math.floor(Math.min(...xs) - m), by = Math.floor(Math.min(...ys) - m);
+      const bw = Math.ceil(Math.max(...xs) + m) - bx, bh = Math.ceil(Math.max(...ys) + m) - by;
+      if (bw > 0 && bh > 0) {
+        const o = document.createElement("canvas"); o.width = bw; o.height = bh;
+        const x = o.getContext("2d");
+        x.font = c.font; x.fillStyle = "#d0021b"; x.textBaseline = "middle";
+        const tw = x.measureText(MARQUE).width + h;
+        if (bw < tw) { // petite zone : des logos qui se découvrent sous le doigt
+          for (let yy = h / 2; yy < bh + h; yy += h * 1.2) for (let xx = 0; xx < bw + h; xx += h * 1.1) dessinerLogo(x, xx, yy, h, fond);
+        } else
+        for (let yy = h / 2; yy < bh + h; yy += h * 1.8) for (let xx = (yy / h) % 2 ? 0 : -tw / 2; xx < bw; xx += tw) x.fillText(MARQUE, xx, yy);
+        x.globalCompositeOperation = "destination-in";
+        x.translate(-bx, -by); strokePath(x, { kind: "line", w: st.w, pts: st.pts }, "#000");
+        c.drawImage(o, bx, by);
+      }
+    }
+    c.restore();
   }
   const unionDe = (rects) => {
     const x0 = Math.min(...rects.map((r) => r.x)), y0 = Math.min(...rects.map((r) => r.y));
@@ -783,10 +844,13 @@
   function ouvrirEtiq(c) {
     etiqCible = c; etiqMode = null;
     $("selbar").hidden = true; $("refbar").hidden = true;
-    $("etiqTitre").textContent = `${etiqJeton(c)} : c'est`;
+    const doigt = !!c.stroke;
+    document.querySelectorAll("#etiqbar [data-etiq], #etiqAutre, #etiqRenommer").forEach((b) => { b.hidden = doigt; });
+    $("etiqTitre").textContent = doigt ? "Effacé au doigt :" : `${etiqJeton(c)} : c'est`;
     $("etiqSaisie").hidden = true; $("etiqAide").hidden = true;
     $("etiqbar").hidden = false;
-    setStatus(c.box && c.box.source ? `Masqué par ${c.box.source}. Choisissez ce que c'est, ou rendez-le visible.` : "Choisissez ce que c'est, ou rendez-le visible.", true);
+    setStatus(c.stroke ? "Effacé au doigt. Pour nommer une donnée, encadrez-la plutôt avec le rectangle." :
+      c.box && c.box.source ? `Masqué par ${c.box.source}. Choisissez ce que c'est, ou rendez-le visible.` : "Choisissez ce que c'est, ou rendez-le visible.", true);
   }
   function fermerEtiq() { etiqCible = null; etiqMode = null; $("etiqbar").hidden = true; }
   function rectDeCible(c) {
@@ -911,7 +975,8 @@
       else if (K.formeIdentifiant(texte)) type = "REF", key = "REF|" + norm(texte);
     }
     const tous = groupes.flat();
-    st.etiq = { rects: rectsDe(tous), zone: unionDe(rectsDe(principal)), key, type, value };
+    // Le doigt efface sans nommer : pas d'étiquette, la marque « kerckhoffs.app » à la place (pour nommer : le rectangle).
+    st.etiq = { rects: rectsDe(tous), zone: unionDe(rectsDe(principal)), key, type, value, marque: true };
     // Le trait couvre-t-il surtout ces mots ? Alors il se range dessus (rien ne dépasse, aucun bout de lettre ne reste).
     const zoneMots = unionDe(st.etiq.rects), marge = st.w;
     const dehors = st.pts.filter(([x, y]) => x < zoneMots.x - marge || x > zoneMots.x + zoneMots.w + marge || y < zoneMots.y - marge || y > zoneMots.y + zoneMots.h + marge).length;
@@ -1163,9 +1228,10 @@
 
   function select(p, rect) {
     S.sel = { page: p, rect };
-    $("selbar").hidden = false; $("refbar").hidden = true;
+    $("selbar").hidden = false; $("refbar").hidden = true; $("selSaisie").hidden = true; $("selPlusBloc").hidden = true;
     // Un rectangle haut et étroit, collé aux traits d'une colonne : on propose de masquer toute la colonne, sauf son en-tête.
     $("selColonne").hidden = !(rect.aimante && rect.h > p.img.height * 0.12 && colonneEntiere(p, rect));
+    if (!$("selColonne").hidden) $("selPlusBloc").hidden = false; // une colonne de tableau : on la propose tout de suite
     render();
   }
   function unselect() { S.sel = null; $("selbar").hidden = true; $("refbar").hidden = true; $("selColonne").hidden = true; render(); }
@@ -1271,7 +1337,17 @@
   $("selRef").addEventListener("click", () => { if (S.sel) { $("selbar").hidden = true; $("refbar").hidden = false; } });
   $("refCancel").addEventListener("click", () => { $("refbar").hidden = true; if (S.sel) $("selbar").hidden = false; });
   $("refbar").addEventListener("pointerdown", (e) => e.stopPropagation());
-  document.querySelectorAll("#refbar [data-ref]").forEach((b) => b.addEventListener("click", () => referencer(b.dataset.ref)));
+  document.querySelectorAll("#refbar [data-ref], #selbar [data-ref]").forEach((b) => b.addEventListener("click", () => referencer(b.dataset.ref)));
+  // « Autre… » : vous écrivez vous-même le nom de l'étiquette (VOITURE, ENTREPRISE…).
+  $("selAutre").addEventListener("click", () => { $("selSaisie").hidden = false; $("selChamp").value = ""; $("selChamp").focus(); });
+  const validerAutre = () => {
+    const code = codeValide($("selChamp").value);
+    if (!code) { setStatus("Lettres sans accent, chiffres et _ . - / seulement (24 signes au plus).", true); return; }
+    $("selSaisie").hidden = true; referencer(code);
+  };
+  $("selOk").addEventListener("click", validerAutre);
+  $("selChamp").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); validerAutre(); } else if (e.key === "Escape") { e.preventDefault(); $("selSaisie").hidden = true; } });
+  $("selPlus").addEventListener("click", () => { $("selPlusBloc").hidden = !$("selPlusBloc").hidden; });
   const motsDans = (p, r) => (p.lines || []).flatMap((l) => l.words).filter((w) => {
     const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2;
     return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
@@ -1297,7 +1373,7 @@
     S.tokens = new Map(); S.counters = {};
     await detectPages(S.pages, () => "");
     const items = nouveaux(avant, { page: p, rect });
-    const nom = { PERSONNE: "un nom", ADRESSE: "une adresse", REF: "une référence", DONNEE: "une donnée" }[type];
+    const nom = { PERSONNE: "un nom", ADRESSE: "une adresse", REF: "une référence", NUMERO: "un numéro ou code", DONNEE: "une donnée" }[type] || `« ${type} »`;
     setStatus(`Zone référencée comme ${nom}.` + (items.length ? ` ${items.length} autre${items.length > 1 ? "s" : ""} trouvée${items.length > 1 ? "s" : ""}, avec la même étiquette : vérifiez avec ‹ ›.` : " Rien de pareil ailleurs."), true);
     montrerTrouves(items, true);
   }
@@ -2098,10 +2174,9 @@
   /* ------------------------------------------------------------- export */
   // La mention en bas des documents envoyés. Sans le mode strict, elle est toujours là.
   // Seul un document contrôlé en mode strict peut partir sans mention, si l'utilisateur le choisit.
-  // Un effacement couleur papier ne se voit pas : la mention reste alors toujours, pour qu'un document ne puisse pas
-  // passer pour intact. En noir ou en flou, les masques se voient : au niveau Strict, on peut retirer la mention.
+  // Au niveau Strict, la mention peut être retirée : chaque effacement porte déjà sa propre marque « kerckhoffs.app ».
   const papierPresent = () => S.pages.some((p) => styleDe(p) === "papier");
-  const avecMention = () => !strict || papierPresent() || $("optMention").checked;
+  const avecMention = () => !strict || $("optMention").checked;
   // La mention dit qui a masqué : la personne, avec l'outil. Ce n'est pas une garantie de Kerckhoffs.
   const texteMention = () => "Masqué par l'utilisateur, avec Kerckhoffs · " + (papierPresent() ? "effacé couleur papier · " : "") +
     (strict ? "vérifié point par point" : "non vérifié point par point");
@@ -2188,7 +2263,7 @@
           if (masked) {
             const mx = (w.bbox.x0 + w.bbox.x1) / 2, my = (w.bbox.y0 + w.bbox.y1) / 2;
             const st = p.strokes.find((s) => (s.kind === "rect" && dans(s, mx, my)) || (s.etiq && s.etiq.rects.some((r) => dans(r, mx, my))));
-            if (st) { const e = st.ref || st.etiq; pousser(e ? tokenFor(e.key, e.type, e.value) : "[MASQUÉ]"); continue; }
+            if (st) { const e = st.ref || (st.etiq && !st.etiq.marque ? st.etiq : null); pousser(e ? tokenFor(e.key, e.type, e.value) : "[MASQUÉ]"); continue; }
           }
           const b = masked && p.boxes.find((bx) => bx.active && bx.words.includes(w));
           if (b) { if (!done.has(b)) { parts.push(b.token); done.add(b); } continue; }
@@ -2870,8 +2945,7 @@
     const men = $("cerbereMention"); men.textContent = "";
     if ($("optMask").checked) {
       men.append(document.createTextNode(avecMention() ? `Ce document portera en bas la mention « ${texteMention()} ».` : "Ce document partira sans mention."));
-      if (strict && papierPresent()) men.append(document.createTextNode(" Elle reste toujours quand un effacement couleur papier est présent : il ne se voit pas."));
-      else if (strict) {
+      if (strict) {
         const b = document.createElement("button"); b.type = "button"; b.className = "btn small";
         b.textContent = avecMention() ? "La retirer" : "La remettre";
         b.addEventListener("click", () => { $("optMention").checked = !$("optMention").checked; changed(); cerbereOk = -1; afficherCerbere(); });
@@ -3264,7 +3338,7 @@
 
 
   /* ------------------------- au premier lancement de chaque version : vérifier sa version */
-  const VERSION_APP = "0.8.6";
+  const VERSION_APP = "0.8.7";
   // Les deux seules adresses internet écrites dans le code de Kerckhoffs. Ce sont des liens à ouvrir dans votre navigateur :
   // l'application ne s'y connecte jamais (voir le verrou connect-src dans index.html).
   const ADRESSE_OFFICIELLE = "https://vernom-stc.github.io/Public/";

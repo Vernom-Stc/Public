@@ -7,7 +7,7 @@
  * 3. Second verrou : refuse toute requête vers un autre site que celui de Kerckhoffs.
  * Changez VERSION à chaque mise à jour de l'application, puis signez-la (outils/signer.mjs).
  */
-const VERSION = "kerckhoffs-v0.8.6";
+const VERSION = "kerckhoffs-v0.8.7";
 const FILES = [
   "./",
   "index.html",
